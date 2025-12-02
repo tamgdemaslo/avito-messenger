@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест - Avito Messenger</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 { color: #00a046; }
+        .success { color: green; }
+        .error { color: red; }
+        code {
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>✅ Тестовая страница работает!</h1>
+        <p>Если вы видите эту страницу, значит:</p>
+        <ul>
+            <li>✅ Flask сервер запущен</li>
+            <li>✅ Статические файлы загружаются</li>
+            <li>✅ Браузер может подключиться к серверу</li>
+        </ul>
+        
+        <h2>Что делать дальше:</h2>
+        <ol>
+            <li>Откройте главную страницу: <a href="/"><code>http://localhost:5000</code></a></li>
+            <li>Если главная страница не работает, проверьте консоль браузера (F12)</li>
+        </ol>
+        
+        <h2>Важно:</h2>
+        <p class="error">⚠️ Убедитесь, что в адресной строке указан порт <code>5000</code>!</p>
+        <p>Правильно: <code>http://localhost:5000</code></p>
+        <p>Неправильно: <code>http://localhost</code> (без порта)</p>
+    </div>
+</body>
+</html>
+
+
+

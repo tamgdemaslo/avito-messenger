@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Тест OAuth</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
+        .info { background: #e3f2fd; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; }
+        .url { background: #fff3cd; padding: 10px; border-radius: 5px; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <h1>Тест OAuth авторизации Avito</h1>
+    
+    <div class="info">
+        <h2>Проверьте настройки:</h2>
+        <ul>
+            <li><strong>Client ID:</strong> <code>{{ client_id }}</code></li>
+            <li><strong>Redirect URI:</strong> <code>{{ redirect_uri }}</code></li>
+            <li><strong>Scopes:</strong> <code>{{ scopes }}</code></li>
+        </ul>
+    </div>
+    
+    <h2>URL авторизации:</h2>
+    <div class="url">
+        <code>{{ auth_url }}</code>
+    </div>
+    
+    <p><a href="{{ auth_url }}" target="_blank">→ Открыть URL авторизации в новой вкладке</a></p>
+    
+    <h2>Важно:</h2>
+    <ol>
+        <li>Убедитесь, что Redirect URI <code>{{ redirect_uri }}</code> добавлен в настройках приложения Avito</li>
+        <li>Проверьте, что Client ID правильный</li>
+        <li>Если URL не работает, попробуйте скопировать его и открыть вручную</li>
+    </ol>
+    
+    <p><a href="/">← Вернуться на главную</a></p>
+</body>
+</html>
+
+
+

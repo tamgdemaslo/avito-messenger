@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Avito Messenger - Сообщения</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        /* Базовые стили на случай, если CSS не загрузится */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+        }
+    </style>
+</head>
+<body>
+    <div class="messages-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>Avito Messenger</h1>
+                <div class="header-actions">
+                    <button class="btn btn-icon" id="refreshBtn" title="Обновить">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <polyline points="1 20 1 14 7 14"></polyline>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                        </svg>
+                    </button>
+                    <a href="/logout" class="btn btn-secondary">Выйти</a>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="messages-layout">
+            <!-- Sidebar with chats -->
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <h2>Чаты</h2>
+                </div>
+                <div class="chats-list" id="chatsList">
+                    <div class="loading">Загрузка чатов...</div>
+                </div>
+            </aside>
+
+            <!-- Messages area -->
+            <main class="messages-main">
+                <div class="messages-header" id="messagesHeader">
+                    <h2>Выберите чат</h2>
+                </div>
+                
+                <div class="messages-list" id="messagesList">
+                    <div class="empty-state">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <p>Выберите чат для просмотра сообщений</p>
+                    </div>
+                </div>
+
+                <!-- Reply form -->
+                <div class="reply-form" id="replyForm" style="display: none;">
+                    <div class="reply-input-wrapper">
+                        <textarea 
+                            id="messageInput" 
+                            placeholder="Введите сообщение..." 
+                            rows="3"
+                        ></textarea>
+                        <button class="btn btn-primary" id="sendBtn">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                            Отправить
+                        </button>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Loading overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
+
