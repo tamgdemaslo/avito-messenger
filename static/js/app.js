@@ -90,25 +90,24 @@ function renderChats() {
             preview = lastMessage.text;
         }
         
-        // Получаем название чата - пробуем разные варианты
+        // Получаем название чата из структуры Avito API
         let chatTitle = 'Без названия';
         
-        if (chat.title && typeof chat.title === 'string') {
-            chatTitle = chat.title;
-        } else if (chat.context) {
-            // context может быть объектом с разными полями
-            if (typeof chat.context === 'string') {
-                chatTitle = chat.context;
-            } else if (typeof chat.context === 'object') {
-                chatTitle = chat.context.value || chat.context.title || chat.context.text || 'Без названия';
+        // Проверяем context.value.title (основной источник названия)
+        if (chat.context && chat.context.value && chat.context.value.title) {
+            chatTitle = chat.context.value.title;
+        } 
+        // Запасной вариант - имя пользователя из users
+        else if (chat.users && chat.users.length > 0) {
+            // Ищем другого пользователя (не текущего)
+            const otherUser = chat.users.find(u => u.id !== chat.user_id && u.name);
+            if (otherUser && otherUser.name) {
+                chatTitle = otherUser.name;
             }
-        } else if (chat.users && chat.users.length > 0) {
-            // Используем имя пользователя
-            const otherUser = chat.users.find(u => u.id !== chat.current_user_id) || chat.users[0];
-            chatTitle = otherUser.name || `ID: ${otherUser.id}`;
-        } else if (chat.item) {
-            // Используем название объявления
-            chatTitle = chat.item.title || chat.item.name || 'Без названия';
+        }
+        // Если title передан напрямую
+        else if (chat.title && typeof chat.title === 'string') {
+            chatTitle = chat.title;
         }
         
         // Проверяем что chatTitle - это строка, а не объект
@@ -155,19 +154,20 @@ async function loadMessages(chatId) {
         let chatTitle = 'Чат';
         
         if (chat) {
-            if (chat.title && typeof chat.title === 'string') {
-                chatTitle = chat.title;
-            } else if (chat.context) {
-                if (typeof chat.context === 'string') {
-                    chatTitle = chat.context;
-                } else if (typeof chat.context === 'object') {
-                    chatTitle = chat.context.value || chat.context.title || chat.context.text || 'Чат';
+            // Проверяем context.value.title (основной источник названия)
+            if (chat.context && chat.context.value && chat.context.value.title) {
+                chatTitle = chat.context.value.title;
+            } 
+            // Запасной вариант - имя пользователя
+            else if (chat.users && chat.users.length > 0) {
+                const otherUser = chat.users.find(u => u.id !== chat.user_id && u.name);
+                if (otherUser && otherUser.name) {
+                    chatTitle = otherUser.name;
                 }
-            } else if (chat.users && chat.users.length > 0) {
-                const otherUser = chat.users.find(u => u.id !== chat.current_user_id) || chat.users[0];
-                chatTitle = otherUser.name || `ID: ${otherUser.id}`;
-            } else if (chat.item) {
-                chatTitle = chat.item.title || chat.item.name || 'Чат';
+            }
+            // Если title передан напрямую
+            else if (chat.title && typeof chat.title === 'string') {
+                chatTitle = chat.title;
             }
             
             // Проверяем что это строка
