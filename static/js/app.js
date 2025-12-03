@@ -112,11 +112,13 @@ function renderChats() {
             if (otherUser) {
                 userName = otherUser.name || `ID ${otherUser.id}`;
                 // Извлекаем аватарку из правильной структуры
-                if (otherUser.avatar) {
-                    if (otherUser.avatar.images && otherUser.avatar.images['48x48']) {
-                        userAvatar = otherUser.avatar.images['48x48'];
-                    } else if (otherUser.avatar.default) {
-                        userAvatar = otherUser.avatar.default;
+                // Аватарки находятся в public_user_profile.avatar
+                if (otherUser.public_user_profile && otherUser.public_user_profile.avatar) {
+                    const avatar = otherUser.public_user_profile.avatar;
+                    if (avatar.images && avatar.images['48x48']) {
+                        userAvatar = avatar.images['48x48'];
+                    } else if (avatar.default) {
+                        userAvatar = avatar.default;
                     }
                 }
                 // Отладочное логирование
@@ -209,17 +211,19 @@ async function loadMessages(chatId) {
                     otherUser = chat.users[0];
                 }
                 
-                if (otherUser) {
-                    userName = otherUser.name || `ID ${otherUser.id}`;
-                    // Извлекаем аватарку из правильной структуры
-                    if (otherUser.avatar) {
-                        if (otherUser.avatar.images && otherUser.avatar.images['48x48']) {
-                            userAvatar = otherUser.avatar.images['48x48'];
-                        } else if (otherUser.avatar.default) {
-                            userAvatar = otherUser.avatar.default;
-                        }
+            if (otherUser) {
+                userName = otherUser.name || `ID ${otherUser.id}`;
+                // Извлекаем аватарку из правильной структуры
+                // Аватарки находятся в public_user_profile.avatar
+                if (otherUser.public_user_profile && otherUser.public_user_profile.avatar) {
+                    const avatar = otherUser.public_user_profile.avatar;
+                    if (avatar.images && avatar.images['48x48']) {
+                        userAvatar = avatar.images['48x48'];
+                    } else if (avatar.default) {
+                        userAvatar = avatar.default;
                     }
                 }
+            }
             } else if (chat.user_id) {
                 userName = `ID ${chat.user_id}`;
             }
@@ -284,11 +288,13 @@ function renderMessages() {
             if (author) {
                 authorName = author.name || `ID ${msg.author_id}`;
                 // Извлекаем аватарку из правильной структуры
-                if (author.avatar) {
-                    if (author.avatar.images && author.avatar.images['36x36']) {
-                        authorAvatar = author.avatar.images['36x36'];
-                    } else if (author.avatar.default) {
-                        authorAvatar = author.avatar.default;
+                // Аватарки находятся в public_user_profile.avatar
+                if (author.public_user_profile && author.public_user_profile.avatar) {
+                    const avatar = author.public_user_profile.avatar;
+                    if (avatar.images && avatar.images['36x36']) {
+                        authorAvatar = avatar.images['36x36'];
+                    } else if (avatar.default) {
+                        authorAvatar = avatar.default;
                     }
                 }
             } else if (msg.author_id === window.currentUserId) {
