@@ -34,9 +34,9 @@ def after_request(response):
 
 # Конфигурация Avito API
 # Используем переменные окружения для продакшена
-AVITO_CLIENT_ID = os.environ.get('AVITO_CLIENT_ID', "HHiafcJb3rn8agxhzM8g")
-AVITO_CLIENT_SECRET = os.environ.get('AVITO_CLIENT_SECRET', "DusHGZF4gADWpNwIHbeefVNwxqoUXe5i_LQ2_g2o")
-AVITO_REDIRECT_URI = os.environ.get('AVITO_REDIRECT_URI', "http://localhost:5002/callback")
+AVITO_CLIENT_ID = os.environ.get('AVITO_CLIENT_ID', "1cIpj04gx6i3v7Ym5wNj")
+AVITO_CLIENT_SECRET = os.environ.get('AVITO_CLIENT_SECRET', "IncASFD6M42y86XctwJitqCwHVE5y7AivuOgkfoK")
+AVITO_REDIRECT_URI = os.environ.get('AVITO_REDIRECT_URI', "https://avito.tamgdemaslocrm.ru/callback")
 AVITO_AUTH_URL = "https://api.avito.ru/oauth"
 AVITO_API_URL = "https://api.avito.ru"
 
