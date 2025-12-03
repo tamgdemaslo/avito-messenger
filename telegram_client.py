@@ -155,12 +155,10 @@ async def get_telegram_chats_async(limit=100):
                     'from_id': msg.sender_id
                 }
             
-            # Аватарка - НЕ загружаем файлы, используем заглушки
-            # Загрузка 100 аватарок занимает 20-30 секунд!
-            # Вместо этого используем initials/placeholder
+            # Аватарка - помечаем что есть, но не загружаем сейчас (ленивая загрузка)
             if hasattr(entity, 'photo') and entity.photo:
-                # Просто помечаем что аватарка есть, но не загружаем
                 chat_data['has_photo'] = True
+                chat_data['avatar_loading'] = False
             else:
                 chat_data['has_photo'] = False
             
@@ -408,4 +406,45 @@ def mark_telegram_read(chat_id):
     except Exception as e:
         print(f"Ошибка пометки чата прочитанным: {e}")
         return {'success': False, 'error': str(e)}
+
+
+async def download_telegram_avatar_async(chat_id):
+    """Загрузить аватарку для конкретного чата (ленивая загрузка)"""
+    client = await init_telegram_client()
+    if not client:
+        return None
+    
+    original_id = int(chat_id.replace('tg_', ''))
+    
+    # Проверяем, не загружена ли уже
+    avatar_path = f'static/avatars/tg_{original_id}.jpg'
+    if os.path.exists(avatar_path):
+        return f'/static/avatars/tg_{original_id}.jpg'
+    
+    try:
+        # Получаем entity для чата
+        entity = await client.get_entity(original_id)
+        
+        if hasattr(entity, 'photo') and entity.photo:
+            photo_path = await client.download_profile_photo(
+                entity,
+                file=avatar_path
+            )
+            if photo_path:
+                print(f"✅ Downloaded avatar for chat {chat_id}")
+                return f'/static/avatars/tg_{original_id}.jpg'
+        
+        return None
+    except Exception as e:
+        print(f"⚠️ Failed to download avatar for {chat_id}: {e}")
+        return None
+
+
+def download_telegram_avatar(chat_id):
+    """Синхронная обертка для загрузки аватарки"""
+    try:
+        return run_async(download_telegram_avatar_async(chat_id))
+    except Exception as e:
+        print(f"Ошибка загрузки аватарки: {e}")
+        return None
 

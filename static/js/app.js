@@ -256,6 +256,11 @@ async function loadChats(silent = false) {
         currentUserId = data.current_user_id;
         
         renderChats();
+        
+        // Ленивая загрузка аватарок Telegram в фоне
+        if (!silent) {
+            lazyLoadTelegramAvatars();
+        }
     } catch (error) {
         if (!silent) showError('Ошибка загрузки чатов: ' + error.message);
     } finally {
@@ -266,6 +271,53 @@ async function loadChats(silent = false) {
 // Запрашиваем разрешение на уведомления
 if ('Notification' in window && Notification.permission === 'default') {
     Notification.requestPermission();
+}
+
+// Ленивая загрузка аватарок Telegram (по одной в фоне)
+let avatarLoadQueue = [];
+let isLoadingAvatars = false;
+
+async function lazyLoadTelegramAvatars() {
+    // Находим все Telegram чаты с аватарками
+    const telegramChatsWithPhotos = chats.filter(chat => 
+        chat.source === 'telegram' && 
+        chat.has_photo && 
+        !chat.avatar
+    );
+    
+    if (telegramChatsWithPhotos.length === 0) {
+        return;
+    }
+    
+    console.log(`🖼️ Lazy loading ${telegramChatsWithPhotos.length} Telegram avatars...`);
+    
+    // Загружаем по одной с задержкой (не перегружаем сервер)
+    for (let i = 0; i < telegramChatsWithPhotos.length; i++) {
+        const chat = telegramChatsWithPhotos[i];
+        
+        // Небольшая задержка между запросами
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        try {
+            const response = await fetch(`/api/telegram/avatar/${chat.id}`);
+            const data = await response.json();
+            
+            if (data.success && data.avatar) {
+                // Обновляем чат с аватаркой
+                const chatInList = chats.find(c => c.id === chat.id);
+                if (chatInList) {
+                    chatInList.avatar = data.avatar;
+                    // Перерисовываем список чатов
+                    renderChats();
+                    console.log(`✅ Loaded avatar for ${chat.name}`);
+                }
+            }
+        } catch (error) {
+            console.log(`⚠️ Failed to load avatar for ${chat.name}:`, error.message);
+        }
+    }
+    
+    console.log(`✅ All avatars loaded`);
 }
 
 // Helper функции для извлечения данных чата

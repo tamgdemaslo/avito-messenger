@@ -692,6 +692,19 @@ def telegram_auth_page():
     return render_template('telegram_auth.html')
 
 
+@app.route('/api/telegram/avatar/<chat_id>', methods=['GET'])
+def get_telegram_avatar(chat_id):
+    """Ленивая загрузка аватарки Telegram чата"""
+    try:
+        avatar_url = telegram_client.download_telegram_avatar(chat_id)
+        if avatar_url:
+            return jsonify({"success": True, "avatar": avatar_url})
+        else:
+            return jsonify({"success": False, "message": "No avatar"}), 404
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @app.route('/test')
 def test():
     """Тестовая страница"""
