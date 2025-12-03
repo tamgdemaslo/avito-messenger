@@ -50,6 +50,14 @@ async function loadChats() {
         }
         
         chats = data.chats || [];
+        
+        // Отладочное логирование в консоль браузера
+        if (chats.length > 0) {
+            console.log('First chat structure:', chats[0]);
+            console.log('First chat title:', chats[0].title);
+            console.log('First chat context:', chats[0].context);
+        }
+        
         renderChats();
     } catch (error) {
         showError('Ошибка загрузки чатов: ' + error.message);
@@ -72,16 +80,42 @@ function renderChats() {
         
         // Правильно извлекаем текст последнего сообщения
         let preview = 'Нет сообщений';
-        if (lastMessage.content && lastMessage.content.text) {
-            preview = lastMessage.content.text;
-        } else if (typeof lastMessage.content === 'string') {
-            preview = lastMessage.content;
+        if (lastMessage.content) {
+            if (typeof lastMessage.content === 'object' && lastMessage.content.text) {
+                preview = lastMessage.content.text;
+            } else if (typeof lastMessage.content === 'string') {
+                preview = lastMessage.content;
+            }
         } else if (lastMessage.text) {
             preview = lastMessage.text;
         }
         
-        // Получаем название чата
-        let chatTitle = chat.title || chat.context?.value || 'Без названия';
+        // Получаем название чата - пробуем разные варианты
+        let chatTitle = 'Без названия';
+        
+        if (chat.title && typeof chat.title === 'string') {
+            chatTitle = chat.title;
+        } else if (chat.context) {
+            // context может быть объектом с разными полями
+            if (typeof chat.context === 'string') {
+                chatTitle = chat.context;
+            } else if (typeof chat.context === 'object') {
+                chatTitle = chat.context.value || chat.context.title || chat.context.text || 'Без названия';
+            }
+        } else if (chat.users && chat.users.length > 0) {
+            // Используем имя пользователя
+            const otherUser = chat.users.find(u => u.id !== chat.current_user_id) || chat.users[0];
+            chatTitle = otherUser.name || `ID: ${otherUser.id}`;
+        } else if (chat.item) {
+            // Используем название объявления
+            chatTitle = chat.item.title || chat.item.name || 'Без названия';
+        }
+        
+        // Проверяем что chatTitle - это строка, а не объект
+        if (typeof chatTitle !== 'string') {
+            console.warn('Chat title is not a string:', chatTitle, 'for chat:', chat);
+            chatTitle = 'Чат';
+        }
         
         return `
             <div class="chat-item ${chat.id === currentChatId ? 'active' : ''}" 
@@ -116,11 +150,33 @@ async function loadMessages(chatId) {
         
         messages = data.messages || [];
         
-        // Получаем информацию о чате
+        // Получаем информацию о чате и правильное название
         const chat = chats.find(c => c.id === chatId);
+        let chatTitle = 'Чат';
+        
         if (chat) {
-            messagesHeader.innerHTML = `<h2>${escapeHtml(chat.title || 'Чат')}</h2>`;
+            if (chat.title && typeof chat.title === 'string') {
+                chatTitle = chat.title;
+            } else if (chat.context) {
+                if (typeof chat.context === 'string') {
+                    chatTitle = chat.context;
+                } else if (typeof chat.context === 'object') {
+                    chatTitle = chat.context.value || chat.context.title || chat.context.text || 'Чат';
+                }
+            } else if (chat.users && chat.users.length > 0) {
+                const otherUser = chat.users.find(u => u.id !== chat.current_user_id) || chat.users[0];
+                chatTitle = otherUser.name || `ID: ${otherUser.id}`;
+            } else if (chat.item) {
+                chatTitle = chat.item.title || chat.item.name || 'Чат';
+            }
+            
+            // Проверяем что это строка
+            if (typeof chatTitle !== 'string') {
+                chatTitle = 'Чат';
+            }
         }
+        
+        messagesHeader.innerHTML = `<h2>${escapeHtml(chatTitle)}</h2>`;
         
         renderMessages();
     } catch (error) {
