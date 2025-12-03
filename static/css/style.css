@@ -381,11 +381,31 @@ body {
     word-wrap: break-word;
 }
 
+.btn-delete-message {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    font-size: 14px;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+.btn-delete-message:hover {
+    opacity: 1;
+}
+
 /* Reply Form */
 .reply-form {
     padding: 20px 24px;
     border-top: 1px solid var(--border-color);
     background: var(--surface);
+}
+
+.reply-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
 }
 
 .reply-input-wrapper {

@@ -324,6 +324,273 @@ def send_message():
     return jsonify({"success": True, "data": result})
 
 
+@app.route('/api/messages/delete', methods=['POST'])
+def delete_message():
+    """Удалить сообщение"""
+    data = request.json
+    chat_id = data.get('chat_id')
+    message_id = data.get('message_id')
+    
+    if not chat_id or not message_id:
+        return jsonify({"error": "chat_id and message_id are required"}), 400
+    
+    profile, error = make_avito_request("GET", "/core/v1/accounts/self")
+    if error:
+        return jsonify({"error": error}), 500
+    
+    user_id = profile.get('id')
+    if not user_id:
+        return jsonify({"error": "Could not get user ID"}), 500
+    
+    result, error = make_avito_request(
+        "POST",
+        f"/messenger/v1/accounts/{user_id}/chats/{chat_id}/messages/{message_id}"
+    )
+    
+    if error:
+        return jsonify({"error": error}), 500
+    
+    return jsonify({"success": True, "data": result})
+
+
+@app.route('/api/chats/<chat_id>/read', methods=['POST'])
+def mark_chat_read(chat_id):
+    """Пометить чат как прочитанный"""
+    profile, error = make_avito_request("GET", "/core/v1/accounts/self")
+    if error:
+        return jsonify({"error": error}), 500
+    
+    user_id = profile.get('id')
+    if not user_id:
+        return jsonify({"error": "Could not get user ID"}), 500
+    
+    result, error = make_avito_request(
+        "POST",
+        f"/messenger/v1/accounts/{user_id}/chats/{chat_id}/read"
+    )
+    
+    if error:
+        return jsonify({"error": error}), 500
+    
+    return jsonify({"success": True, "data": result})
+
+
+@app.route('/api/images/upload', methods=['POST'])
+def upload_image():
+    """Загрузить изображение"""
+    if 'image' not in request.files:
+        return jsonify({"error": "No image file provided"}), 400
+    
+    file = request.files['image']
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+    
+    profile, error = make_avito_request("GET", "/core/v1/accounts/self")
+    if error:
+        return jsonify({"error": error}), 500
+    
+    user_id = profile.get('id')
+    if not user_id:
+        return jsonify({"error": "Could not get user ID"}), 500
+    
+    # Подготовка multipart/form-data запроса
+    files = {'uploadfile[]': (file.filename, file.stream, file.content_type)}
+    
+    token = get_avito_token()
+    if not token:
+        return jsonify({"error": "No access token"}), 401
+    
+    headers = {
+        'Authorization': f'Bearer {token}'
+    }
+    
+    try:
+        response = requests.post(
+            f"{AVITO_API_URL}/messenger/v1/accounts/{user_id}/uploadImages",
+            files=files,
+            headers=headers
+        )
+        response.raise_for_status()
+        return jsonify({"success": True, "data": response.json()})
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/messages/send-image', methods=['POST'])
+def send_image_message():
+    """Отправить сообщение с изображением"""
+    data = request.json
+    chat_id = data.get('chat_id')
+    image_id = data.get('image_id')
+    
+    if not chat_id or not image_id:
+        return jsonify({"error": "chat_id and image_id are required"}), 400
+    
+    profile, error = make_avito_request("GET", "/core/v1/accounts/self")
+    if error:
+        return jsonify({"error": error}), 500
+    
+    user_id = profile.get('id')
+    if not user_id:
+        return jsonify({"error": "Could not get user ID"}), 500
+    
+    image_data = {"image_id": image_id}
+    
+    result, error = make_avito_request(
+        "POST",
+        f"/messenger/v1/accounts/{user_id}/chats/{chat_id}/messages/image",
+        image_data
+    )
+    
+    if error:
+        return jsonify({"error": error}), 500
+    
+    return jsonify({"success": True, "data": result})
+
+
+@app.route('/api/voice/get', methods=['GET'])
+def get_voice_messages():
+    """Получить голосовые сообщения"""
+    voice_ids = request.args.getlist('voice_ids')
+    
+    if not voice_ids:
+        return jsonify({"error": "voice_ids parameter is required"}), 400
+    
+    profile, error = make_avito_request("GET", "/core/v1/accounts/self")
+    if error:
+        return jsonify({"error": error}), 500
+    
+    user_id = profile.get('id')
+    if not user_id:
+        return jsonify({"error": "Could not get user ID"}), 500
+    
+    # Формируем query string с массивом voice_ids
+    query_params = '&'.join([f'voice_ids={vid}' for vid in voice_ids])
+    
+    result, error = make_avito_request(
+        "GET",
+        f"/messenger/v1/accounts/{user_id}/getVoiceFiles?{query_params}"
+    )
+    
+    if error:
+        return jsonify({"error": error}), 500
+    
+    return jsonify({"success": True, "data": result})
+
+
+@app.route('/api/blacklist/add', methods=['POST'])
+def add_to_blacklist():
+    """Добавить пользователя в черный список"""
+    data = request.json
+    users = data.get('users', [])
+    
+    if not users:
+        return jsonify({"error": "users array is required"}), 400
+    
+    profile, error = make_avito_request("GET", "/core/v1/accounts/self")
+    if error:
+        return jsonify({"error": error}), 500
+    
+    user_id = profile.get('id')
+    if not user_id:
+        return jsonify({"error": "Could not get user ID"}), 500
+    
+    blacklist_data = {"users": users}
+    
+    result, error = make_avito_request(
+        "POST",
+        f"/messenger/v2/accounts/{user_id}/blacklist",
+        blacklist_data
+    )
+    
+    if error:
+        return jsonify({"error": error}), 500
+    
+    return jsonify({"success": True, "data": result})
+
+
+@app.route('/api/webhooks/list', methods=['POST'])
+def list_webhooks():
+    """Получить список подписок"""
+    result, error = make_avito_request(
+        "POST",
+        "/messenger/v1/subscriptions"
+    )
+    
+    if error:
+        return jsonify({"error": error}), 500
+    
+    return jsonify({"success": True, "data": result})
+
+
+@app.route('/api/webhooks/subscribe', methods=['POST'])
+def subscribe_webhook():
+    """Подписаться на webhook уведомления"""
+    data = request.json
+    url = data.get('url')
+    
+    if not url:
+        return jsonify({"error": "url is required"}), 400
+    
+    webhook_data = {"url": url}
+    
+    result, error = make_avito_request(
+        "POST",
+        "/messenger/v3/webhook",
+        webhook_data
+    )
+    
+    if error:
+        return jsonify({"error": error}), 500
+    
+    return jsonify({"success": True, "data": result})
+
+
+@app.route('/api/webhooks/unsubscribe', methods=['POST'])
+def unsubscribe_webhook():
+    """Отписаться от webhook уведомлений"""
+    data = request.json
+    url = data.get('url')
+    
+    if not url:
+        return jsonify({"error": "url is required"}), 400
+    
+    webhook_data = {"url": url}
+    
+    result, error = make_avito_request(
+        "POST",
+        "/messenger/v1/webhook/unsubscribe",
+        webhook_data
+    )
+    
+    if error:
+        return jsonify({"error": error}), 500
+    
+    return jsonify({"success": True, "data": result})
+
+
+@app.route('/api/chats/<chat_id>/info', methods=['GET'])
+def get_chat_info(chat_id):
+    """Получить информацию о конкретном чате"""
+    profile, error = make_avito_request("GET", "/core/v1/accounts/self")
+    if error:
+        return jsonify({"error": error}), 500
+    
+    user_id = profile.get('id')
+    if not user_id:
+        return jsonify({"error": "Could not get user ID"}), 500
+    
+    result, error = make_avito_request(
+        "GET",
+        f"/messenger/v2/accounts/{user_id}/chats/{chat_id}"
+    )
+    
+    if error:
+        return jsonify({"error": error}), 500
+    
+    return jsonify({"success": True, "data": result})
+
+
 @app.route('/test')
 def test():
     """Тестовая страница"""

@@ -157,6 +157,19 @@ async function selectChat(chatId) {
     renderChats();
     await loadMessages(chatId);
     replyForm.style.display = 'block';
+    
+    // Помечаем чат прочитанным
+    markChatAsRead(chatId);
+}
+
+async function markChatAsRead(chatId) {
+    try {
+        await fetch(`/api/chats/${chatId}/read`, {
+            method: 'POST'
+        });
+    } catch (error) {
+        console.error('Error marking chat as read:', error);
+    }
 }
 
 async function loadMessages(chatId) {
@@ -228,6 +241,16 @@ async function loadMessages(chatId) {
             </div>
         `;
         
+        // Показываем кнопку блокировки и привязываем её к пользователю
+        const blockBtn = document.getElementById('blockUserBtn');
+        if (blockBtn && chat && chat.users && chat.users.length > 0) {
+            const otherUser = chat.users.find(u => u.id !== currentUserId && u.id !== window.currentUserId);
+            if (otherUser) {
+                blockBtn.style.display = 'inline-flex';
+                blockBtn.onclick = () => blockUser(otherUser.id);
+            }
+        }
+        
         renderMessages();
     } catch (error) {
         showError('Ошибка загрузки сообщений: ' + error.message);
@@ -286,13 +309,17 @@ function renderMessages() {
             text = '[Сообщение без текста]';
         }
         
+        // Проверяем можно ли удалить сообщение (только свои, не старше часа)
+        const canDelete = isOwn && (Date.now() - msg.created * 1000) < 3600000;
+        
         return `
-            <div class="message-item ${isOwn ? 'own' : ''}">
+            <div class="message-item ${isOwn ? 'own' : ''}" data-message-id="${msg.id}">
                 ${!isOwn && authorAvatar ? `<img src="${escapeHtml(authorAvatar)}" alt="${escapeHtml(authorName)}" class="message-avatar" onerror="this.style.display='none'">` : ''}
                 <div class="message-content">
                     <div class="message-item-header">
                         <div class="message-item-author">${escapeHtml(authorName)}</div>
                         <div class="message-item-time">${time}</div>
+                        ${canDelete ? `<button class="btn-delete-message" onclick="deleteMessage('${msg.id}')" title="Удалить">🗑️</button>` : ''}
                     </div>
                     <div class="message-item-text">${escapeHtml(text)}</div>
                 </div>
@@ -340,6 +367,141 @@ async function sendMessage() {
         await loadChats();
     } catch (error) {
         showError('Ошибка отправки сообщения: ' + error.message);
+    } finally {
+        hideLoading();
+    }
+}
+
+async function deleteMessage(messageId) {
+    if (!confirm('Вы уверены, что хотите удалить это сообщение?')) {
+        return;
+    }
+    
+    showLoading();
+    try {
+        const response = await fetch('/api/messages/delete', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                chat_id: currentChatId,
+                message_id: messageId
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            showError(data.error);
+            return;
+        }
+        
+        // Обновляем сообщения
+        await loadMessages(currentChatId);
+    } catch (error) {
+        showError('Ошибка удаления сообщения: ' + error.message);
+    } finally {
+        hideLoading();
+    }
+}
+
+async function sendImage() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    
+    input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        showLoading();
+        try {
+            // Загружаем изображение
+            const formData = new FormData();
+            formData.append('image', file);
+            
+            const uploadResponse = await fetch('/api/images/upload', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const uploadData = await uploadResponse.json();
+            
+            if (uploadData.error) {
+                showError(uploadData.error);
+                return;
+            }
+            
+            // Получаем ID загруженного изображения
+            const imageData = uploadData.data;
+            const imageId = Object.keys(imageData)[0];
+            
+            if (!imageId) {
+                showError('Не удалось получить ID изображения');
+                return;
+            }
+            
+            // Отправляем сообщение с изображением
+            const sendResponse = await fetch('/api/messages/send-image', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    chat_id: currentChatId,
+                    image_id: imageId
+                })
+            });
+            
+            const sendData = await sendResponse.json();
+            
+            if (sendData.error) {
+                showError(sendData.error);
+                return;
+            }
+            
+            // Обновляем сообщения
+            await loadMessages(currentChatId);
+            await loadChats();
+        } catch (error) {
+            showError('Ошибка отправки изображения: ' + error.message);
+        } finally {
+            hideLoading();
+        }
+    };
+    
+    input.click();
+}
+
+async function blockUser(userId) {
+    if (!confirm('Вы уверены, что хотите заблокировать этого пользователя?')) {
+        return;
+    }
+    
+    showLoading();
+    try {
+        const response = await fetch('/api/blacklist/add', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                users: [{ id: userId }]
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            showError(data.error);
+            return;
+        }
+        
+        alert('Пользователь заблокирован');
+        await loadChats();
+    } catch (error) {
+        showError('Ошибка блокировки пользователя: ' + error.message);
     } finally {
         hideLoading();
     }
