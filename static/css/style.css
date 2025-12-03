@@ -148,6 +148,7 @@ body {
     margin: 0 auto;
     width: 100%;
     height: calc(100vh - 73px);
+    overflow: hidden;
 }
 
 /* Sidebar */
@@ -258,6 +259,8 @@ body {
     background: var(--surface);
     position: relative;
     overflow: hidden;
+    min-height: 0;
+    max-height: 100%;
 }
 
 .messages-header {
