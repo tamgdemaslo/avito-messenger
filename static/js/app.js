@@ -339,7 +339,19 @@ function renderChats() {
         
         // Проверяем непрочитанные сообщения
         const unreadCount = chat.unread_count || 0;
-        const isUnread = unreadCount > 0 || (lastMessage.direction !== 'out' && lastMessage.type !== 'outgoing' && !lastMessage.isRead);
+        
+        // Для Telegram используем unread_count
+        // Для Avito проверяем последнее сообщение
+        let isUnread = false;
+        if (chat.source === 'telegram') {
+            isUnread = unreadCount > 0;
+        } else {
+            // Avito: проверяем, что последнее сообщение входящее и не прочитано
+            const isIncoming = lastMessage.direction === 'in' || lastMessage.type === 'incoming';
+            const isNotRead = !lastMessage.isRead;
+            isUnread = isIncoming && isNotRead;
+        }
+        
         const unreadClass = isUnread ? 'unread' : '';
         const unreadBadge = unreadCount > 0 ? `<span class="unread-badge">${unreadCount}</span>` : '';
         

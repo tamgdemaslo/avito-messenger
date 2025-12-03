@@ -197,18 +197,18 @@ body {
     border-left: 3px solid var(--primary-color);
 }
 
-/* Непрочитанные чаты */
+/* Непрочитанные чаты - выделяются жирным шрифтом */
 .chat-item.unread {
     background: #f8f9fa;
 }
 
 .chat-item.unread .chat-item-name {
-    font-weight: 700;
+    font-weight: 700; /* Жирный только для непрочитанных */
 }
 
 .chat-item.unread .chat-item-preview {
-    font-weight: 600;
-    color: var(--text-primary);
+    font-weight: 600; /* Полужирный для превью непрочитанных */
+    color: #212529; /* Темнее для лучшей видимости */
 }
 
 .chat-item-avatar-wrapper {
@@ -266,7 +266,7 @@ body {
 }
 
 .chat-item-name {
-    font-weight: 600;
+    font-weight: 400;
     color: var(--text-primary);
     font-size: 15px;
 }
@@ -311,6 +311,7 @@ body {
 
 .chat-item-preview {
     font-size: 13px;
+    font-weight: 400;
     color: var(--text-secondary);
     overflow: hidden;
     text-overflow: ellipsis;
