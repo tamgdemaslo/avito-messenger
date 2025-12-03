@@ -69,13 +69,25 @@ function renderChats() {
         const time = lastMessage.created 
             ? formatTime(lastMessage.created * 1000)
             : '';
-        const preview = lastMessage.text || 'Нет сообщений';
+        
+        // Правильно извлекаем текст последнего сообщения
+        let preview = 'Нет сообщений';
+        if (lastMessage.content && lastMessage.content.text) {
+            preview = lastMessage.content.text;
+        } else if (typeof lastMessage.content === 'string') {
+            preview = lastMessage.content;
+        } else if (lastMessage.text) {
+            preview = lastMessage.text;
+        }
+        
+        // Получаем название чата
+        let chatTitle = chat.title || chat.context?.value || 'Без названия';
         
         return `
             <div class="chat-item ${chat.id === currentChatId ? 'active' : ''}" 
                  onclick="selectChat('${chat.id}')">
                 <div class="chat-item-header">
-                    <div class="chat-item-name">${escapeHtml(chat.title || 'Без названия')}</div>
+                    <div class="chat-item-name">${escapeHtml(chatTitle)}</div>
                     <div class="chat-item-time">${time}</div>
                 </div>
                 <div class="chat-item-preview">${escapeHtml(preview)}</div>
@@ -133,13 +145,24 @@ function renderMessages() {
         const time = msg.created 
             ? formatTime(msg.created * 1000)
             : '';
-        const author = msg.author || msg.user_id || 'Пользователь';
-        const text = msg.text || msg.content || '';
+        const author = msg.author_id || msg.author || msg.user_id || 'Пользователь';
+        
+        // Правильно извлекаем текст из структуры Avito API
+        let text = '';
+        if (msg.content && msg.content.text) {
+            text = msg.content.text;
+        } else if (typeof msg.content === 'string') {
+            text = msg.content;
+        } else if (msg.text) {
+            text = msg.text;
+        } else {
+            text = '[Сообщение без текста]';
+        }
         
         return `
             <div class="message-item ${isOwn ? 'own' : ''}">
                 <div class="message-item-header">
-                    <div class="message-item-author">${escapeHtml(author)}</div>
+                    <div class="message-item-author">${escapeHtml(String(author))}</div>
                     <div class="message-item-time">${time}</div>
                 </div>
                 <div class="message-item-text">${escapeHtml(text)}</div>
