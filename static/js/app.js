@@ -79,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function startAutoRefresh() {
-    // Обновляем чаты каждые 5 секунд
+    // Обновляем чаты каждые 2 секунды для быстрого обмена
     autoRefreshInterval = setInterval(async () => {
         await loadChats(true); // true = тихое обновление (без показа загрузки)
         
@@ -87,7 +87,7 @@ function startAutoRefresh() {
         if (currentChatId) {
             await loadMessages(currentChatId, true);
         }
-    }, 5000); // 5 секунд
+    }, 2000); // 2 секунды - быстрое обновление
 }
 
 function stopAutoRefresh() {
@@ -634,13 +634,28 @@ function renderSingleMessage(msg, index) {
     // Проверяем можно ли удалить сообщение (только свои, не старше часа)
     const canDelete = isOwn && (Date.now() - msg.created * 1000) < 3600000;
     
+    // Статус доставки (галочки) - только для исходящих
+    let deliveryStatus = '';
+    if (isOwn) {
+        if (msg.isPending) {
+            // Отправляется - одна галочка
+            deliveryStatus = '<span class="delivery-status pending" title="Отправляется">✓</span>';
+        } else if (msg.isRead) {
+            // Прочитано - две синие галочки
+            deliveryStatus = '<span class="delivery-status read" title="Прочитано">✓✓</span>';
+        } else {
+            // Доставлено - две серые галочки
+            deliveryStatus = '<span class="delivery-status delivered" title="Доставлено">✓✓</span>';
+        }
+    }
+    
     return `
-        <div class="message-item ${isOwn ? 'own' : ''}" data-message-id="${msg.id}">
+        <div class="message-item ${isOwn ? 'own' : ''} ${msg.isPending ? 'pending' : ''}" data-message-id="${msg.id}">
             ${!isOwn && authorAvatar ? `<img src="${escapeHtml(authorAvatar)}" alt="${escapeHtml(authorName)}" class="message-avatar" onerror="this.style.display='none'">` : ''}
             <div class="message-content">
                 <div class="message-item-header">
                     ${!isOwn ? `<div class="message-item-author">${escapeHtml(authorName)}</div>` : ''}
-                    <div class="message-item-time">${time}</div>
+                    <div class="message-item-time">${time} ${deliveryStatus}</div>
                     ${canDelete ? `<button class="btn-delete-message" onclick="deleteMessage('${msg.id}')" title="Удалить">🗑️</button>` : ''}
                 </div>
                 <div class="message-item-text">${escapeHtml(text)}</div>
@@ -667,6 +682,29 @@ async function sendMessage() {
         }
     }
     
+    // Создаем оптимистичное сообщение (сразу показываем в UI)
+    const optimisticMessage = {
+        id: `temp_${Date.now()}`,
+        content: { text: text },
+        text: text,
+        created: Date.now() / 1000,
+        type: 'outgoing',
+        direction: 'out',
+        author_id: currentUserId || window.currentUserId,
+        isPending: true, // Статус "отправляется" - одна галочка
+        isRead: false
+    };
+    
+    // Добавляем в список сообщений сразу
+    messages.push(optimisticMessage);
+    renderMessages(); // Перерисовываем с новым сообщением
+    
+    // Прокручиваем вниз
+    messagesList.scrollTo({
+        top: messagesList.scrollHeight,
+        behavior: 'smooth'
+    });
+    
     // Отправляем сообщение в фоне без блокировки UI
     try {
         const response = await fetch('/api/messages/send', {
@@ -683,16 +721,24 @@ async function sendMessage() {
         const data = await response.json();
         
         if (data.error) {
+            // Удаляем оптимистичное сообщение при ошибке
+            messages = messages.filter(m => m.id !== optimisticMessage.id);
+            renderMessages();
             showError(data.error);
             // Возвращаем текст обратно в поле если ошибка
             messageInput.value = text;
             return;
         }
         
-        // Тихо обновляем сообщения и чаты в фоне
-        loadMessages(currentChatId, true);
-        loadChats(true);
+        // Убираем статус "pending" и обновляем через 1 секунду
+        setTimeout(() => {
+            loadMessages(currentChatId, true);
+            loadChats(true);
+        }, 1000);
     } catch (error) {
+        // Удаляем оптимистичное сообщение при ошибке
+        messages = messages.filter(m => m.id !== optimisticMessage.id);
+        renderMessages();
         showError('Ошибка отправки сообщения: ' + error.message);
         // Возвращаем текст обратно в поле если ошибка
         messageInput.value = text;
