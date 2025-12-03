@@ -33,8 +33,8 @@ def after_request(response):
     return response
 
 # Конфигурация Avito API - используем персональную авторизацию
-AVITO_CLIENT_ID = os.environ.get('AVITO_CLIENT_ID', "HHiafcJb3rn8agxhzM8g")
-AVITO_CLIENT_SECRET = os.environ.get('AVITO_CLIENT_SECRET', "DusHGZF4gADWpNwIHbeefVNwxqoUXe5i_LQ2_g2o")
+AVITO_CLIENT_ID = os.environ.get('AVITO_CLIENT_ID', "1cIpj04gx6i3v7Ym5wNj")
+AVITO_CLIENT_SECRET = os.environ.get('AVITO_CLIENT_SECRET', "IncASFD6M42y86XctwJitqCwHVE5y7AivuOgkfoK")
 AVITO_API_URL = "https://api.avito.ru"
 
 # Хранилище токена
