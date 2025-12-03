@@ -123,6 +123,15 @@ async def get_telegram_chats_async(limit=100):
         try:
             entity = dialog.entity
             
+            # ФИЛЬТР: Загружаем ТОЛЬКО личные диалоги с пользователями
+            # Пропускаем группы (Chat) и каналы (Channel)
+            if not isinstance(entity, User):
+                continue
+            
+            # Пропускаем ботов (опционально)
+            # if hasattr(entity, 'bot') and entity.bot:
+            #     continue
+            
             # Получаем информацию о чате
             chat_data = {
                 'id': f'tg_{dialog.id}',
@@ -132,6 +141,8 @@ async def get_telegram_chats_async(limit=100):
                 'unread_count': dialog.unread_count,
                 'created': int(dialog.date.timestamp()) if dialog.date else 0,
                 'updated': int(dialog.date.timestamp()) if dialog.date else 0,
+                'type': 'private',
+                'is_bot': entity.bot if hasattr(entity, 'bot') else False
             }
             
             # Последнее сообщение
@@ -155,16 +166,6 @@ async def get_telegram_chats_async(limit=100):
                         chat_data['avatar'] = f'/static/avatars/tg_{dialog.id}.jpg'
                 except Exception as e:
                     print(f"Не удалось загрузить аватарку для {dialog.name}: {e}")
-            
-            # Тип чата
-            if isinstance(entity, User):
-                chat_data['type'] = 'private'
-                chat_data['is_bot'] = entity.bot if hasattr(entity, 'bot') else False
-            elif isinstance(entity, Chat):
-                chat_data['type'] = 'group'
-            elif isinstance(entity, Channel):
-                chat_data['type'] = 'channel'
-                chat_data['is_broadcast'] = entity.broadcast if hasattr(entity, 'broadcast') else False
             
             chats.append(chat_data)
         except Exception as e:
