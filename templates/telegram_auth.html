@@ -102,7 +102,7 @@
                 if (data.status === 'authorized' || data.status === 'already_authorized') {
                     document.getElementById('authStep2').style.display = 'none';
                     document.getElementById('authSuccess').style.display = 'block';
-                } else if (data.message && data.message.includes('password')) {
+                } else if (data.status === 'password_required' || (data.message && data.message.includes('password'))) {
                     document.getElementById('authStep2').style.display = 'none';
                     document.getElementById('authStep3').style.display = 'block';
                 } else {

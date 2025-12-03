@@ -17,6 +17,7 @@ TELEGRAM_PHONE = os.environ.get('TELEGRAM_PHONE', '+79992556031')
 # Глобальный клиент
 telegram_client = None
 client_loop = None
+phone_code_hash_storage = {}  # Хранилище для phone_code_hash
 
 
 def get_event_loop():
@@ -75,13 +76,15 @@ async def init_telegram_client():
 
 def run_async(coro):
     """Запуск async функции синхронно"""
-    # Создаем новый event loop для каждого запроса (Flask/gunicorn синхронный)
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
+    global client_loop
+    
+    # Переиспользуем существующий loop или создаем новый
+    if not client_loop or client_loop.is_closed():
+        client_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(client_loop)
+    
+    # НЕ закрываем loop - Telegram клиент использует его для фоновых задач
+    return client_loop.run_until_complete(coro)
 
 
 async def get_telegram_chats_async(limit=100):
@@ -242,50 +245,74 @@ async def send_telegram_message_async(chat_id, text):
 
 async def authorize_telegram_async(phone, code=None, password=None):
     """Авторизация в Telegram"""
-    global telegram_client
+    global telegram_client, phone_code_hash_storage
     
     try:
-        # Закрываем существующий клиент, если есть
-        if telegram_client:
-            try:
-                await telegram_client.disconnect()
-            except:
-                pass
-        
-        # Создаем новый клиент
-        telegram_client = TelegramClient(
-            'avito_crm_session',
-            TELEGRAM_API_ID,
-            TELEGRAM_API_HASH
-        )
-        
-        await telegram_client.connect()
+        # Создаем/переиспользуем клиент
+        if not telegram_client or not telegram_client.is_connected():
+            telegram_client = TelegramClient(
+                'avito_crm_session',
+                TELEGRAM_API_ID,
+                TELEGRAM_API_HASH
+            )
+            await telegram_client.connect()
         
         # Проверяем, авторизован ли уже
         if await telegram_client.is_user_authorized():
             return {'status': 'already_authorized', 'message': 'Уже авторизованы'}
         
         if not code:
-            # Отправляем код
-            await telegram_client.send_code_request(phone)
+            # Отправляем код и СОХРАНЯЕМ phone_code_hash
+            result = await telegram_client.send_code_request(phone)
+            phone_code_hash_storage[phone] = result.phone_code_hash
+            print(f"Telegram: код отправлен, phone_code_hash сохранен для {phone}")
             return {'status': 'code_sent', 'message': 'Код отправлен на ваш Telegram'}
         else:
-            # Авторизуемся с кодом
+            # Авторизуемся с кодом и сохраненным phone_code_hash
             try:
-                await telegram_client.sign_in(phone, code, password=password)
+                phone_code_hash = phone_code_hash_storage.get(phone)
+                
+                # Если есть пароль, используем check_password
+                if password:
+                    try:
+                        await telegram_client.sign_in(password=password)
+                        if await telegram_client.is_user_authorized():
+                            phone_code_hash_storage.pop(phone, None)
+                            print(f"Telegram: авторизация с 2FA успешна для {phone}")
+                            return {'status': 'authorized', 'message': 'Авторизация успешна'}
+                    except Exception as e:
+                        print(f"Telegram: ошибка 2FA: {e}")
+                        return {'status': 'error', 'message': f'Неверный пароль 2FA: {str(e)}'}
+                
+                # Обычная авторизация с кодом
+                if not phone_code_hash:
+                    return {'status': 'error', 'message': 'Сначала запросите код'}
+                
+                await telegram_client.sign_in(
+                    phone, 
+                    code, 
+                    phone_code_hash=phone_code_hash
+                )
+                
                 # Проверяем успешность
                 if await telegram_client.is_user_authorized():
+                    # Удаляем phone_code_hash из хранилища
+                    phone_code_hash_storage.pop(phone, None)
+                    print(f"Telegram: авторизация успешна для {phone}")
                     return {'status': 'authorized', 'message': 'Авторизация успешна'}
                 else:
                     return {'status': 'error', 'message': 'Авторизация не удалась'}
             except Exception as e:
                 error_msg = str(e)
                 # Проверяем, нужен ли пароль 2FA
-                if 'password' in error_msg.lower() or '2FA' in error_msg:
+                if 'password' in error_msg.lower() or 'SessionPasswordNeededError' in error_msg:
                     return {'status': 'password_required', 'message': 'Требуется пароль 2FA'}
+                print(f"Telegram: ошибка sign_in: {error_msg}")
                 return {'status': 'error', 'message': error_msg}
     except Exception as e:
-        return {'status': 'error', 'message': f'Ошибка авторизации: {str(e)}'}
+        error_msg = str(e)
+        print(f"Telegram: общая ошибка авторизации: {error_msg}")
+        return {'status': 'error', 'message': f'Ошибка авторизации: {error_msg}'}
 
 
 async def get_telegram_user_info_async(user_id):
