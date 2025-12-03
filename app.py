@@ -180,7 +180,7 @@ def callback():
     
     try:
         response = requests.post(
-            f"{AVITO_AUTH_URL}/token",
+            f"{AVITO_API_URL}/token",
             data=token_data,
             headers={"Content-Type": "application/x-www-form-urlencoded"}
         )
@@ -229,7 +229,7 @@ def refresh_access_token():
     
     try:
         response = requests.post(
-            f"{AVITO_AUTH_URL}/token",
+            f"{AVITO_API_URL}/token",
             data=token_data,
             headers={"Content-Type": "application/x-www-form-urlencoded"}
         )
