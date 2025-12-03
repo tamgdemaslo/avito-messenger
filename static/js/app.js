@@ -5,6 +5,7 @@ let chats = [];
 let messages = [];
 let messagesCache = {}; // Кэш сообщений для быстрого переключения
 let currentLoadController = null; // Контроллер для отмены предыдущих запросов
+let loadRequestId = 0; // Счетчик запросов для игнорирования старых
 
 // DOM Elements
 const chatsList = document.getElementById('chatsList');
@@ -81,15 +82,24 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function startAutoRefresh() {
-    // Обновляем чаты каждые 2 секунды для быстрого обмена
+    // Обновляем ТОЛЬКО текущий открытый чат каждые 3 секунды
+    // Список чатов обновляем реже (каждые 10 секунд)
+    
+    let chatRefreshCounter = 0;
+    
     autoRefreshInterval = setInterval(async () => {
-        await loadChats(true); // true = тихое обновление (без показа загрузки)
+        chatRefreshCounter++;
         
-        // Если открыт чат, обновляем и его сообщения
+        // Обновляем список чатов каждые 10 секунд (каждый 3-й раз)
+        if (chatRefreshCounter % 3 === 0) {
+            await loadChats(true);
+        }
+        
+        // Обновляем сообщения ТОЛЬКО текущего открытого чата
         if (currentChatId) {
             await loadMessages(currentChatId, true);
         }
-    }, 2000); // 2 секунды - быстрое обновление
+    }, 3000); // 3 секунды
 }
 
 function stopAutoRefresh() {
@@ -197,18 +207,7 @@ async function loadChats(silent = false) {
         const newChats = data.chats || [];
         const oldChats = [...chats];
         
-        // ОПТИМИЗАЦИЯ: Предзагрузка первых 3 чатов
-        if (!silent && newChats.length > 0) {
-            setTimeout(() => {
-                // Загружаем первые 3 чата в фоне
-                for (let i = 0; i < Math.min(3, newChats.length); i++) {
-                    const chatId = newChats[i].id;
-                    if (!messagesCache[chatId]) {
-                        prefetchChat(chatId);
-                    }
-                }
-            }, 100);
-        }
+        // НЕ делаем никакой предзагрузки - только по требованию!
         
         // Проверяем новые сообщения
         let hasNewMessages = false;
@@ -399,8 +398,7 @@ function renderChats() {
         
         return `
             <div class="chat-item ${chat.id === currentChatId ? 'active' : ''} ${unreadClass}" 
-                 onclick="selectChat('${chat.id}')"
-                 onmouseover="prefetchChat('${chat.id}')">
+                 onclick="selectChat('${chat.id}')">
                 <div class="chat-item-avatar-wrapper">
                     ${userAvatar ? `<img src="${escapeHtml(userAvatar)}" alt="${escapeHtml(userName)}" class="chat-item-avatar" onerror="this.style.display='none'">` : '<div class="chat-item-avatar-placeholder"></div>'}
                     ${unreadBadge}
@@ -463,15 +461,23 @@ async function markChatAsRead(chatId) {
 }
 
 async function loadMessages(chatId, silent = false) {
-    // Создаем новый контроллер для отмены запроса
-    if (!silent) {
-        currentLoadController = new AbortController();
+    // Генерируем уникальный ID для этого запроса
+    const requestId = ++loadRequestId;
+    
+    // Отменяем предыдущий fetch
+    if (currentLoadController) {
+        currentLoadController.abort();
     }
+    currentLoadController = new AbortController();
     
-    // Проверяем кэш - если есть, показываем сразу (мгновенно)
+    console.log(`🔄 Loading chat ${chatId}, requestId: ${requestId}`);
+    
+    // Проверяем кэш
     const hasCache = messagesCache[chatId];
+    const cacheAge = hasCache ? (Date.now() - messagesCache[chatId].timestamp) : Infinity;
+    const isCacheFresh = cacheAge < 30000; // Кэш свежий если < 30 секунд
     
-    if (hasCache && !silent) {
+    if (hasCache) {
         messages = messagesCache[chatId].messages;
         window.currentChatInfo = messagesCache[chatId].chatInfo;
         window.currentUserId = messagesCache[chatId].userId;
@@ -480,21 +486,47 @@ async function loadMessages(chatId, silent = false) {
         renderChatHeader(messagesCache[chatId].chatInfo);
         renderMessages();
         
-        // Прокручиваем вниз
-        messagesList.scrollTo({
-            top: messagesList.scrollHeight,
-            behavior: 'auto' // Без анимации для скорости
-        });
+        // Прокрутка вниз
+        if (!silent) {
+            messagesList.scrollTo({
+                top: messagesList.scrollHeight,
+                behavior: 'auto'
+            });
+        }
+        
+        console.log(`⚡ Loaded from cache ${chatId} (age: ${Math.round(cacheAge/1000)}s)`);
+        
+        // Если кэш свежий (< 30 сек) И это не тихое обновление - НЕ делаем запрос!
+        if (isCacheFresh && !silent) {
+            console.log(`✅ Cache is fresh, skipping API request`);
+            return;
+        }
     } else if (!silent && !hasCache) {
         // Показываем скелетон только если нет кэша
         showMessagesSkeleton();
     }
     
-    // Загружаем свежие данные в фоне
+    // Загружаем данные
     try {
+        const fetchStartTime = Date.now();
         const response = await fetch(`/api/chats/${chatId}/messages`, {
-            signal: !silent ? currentLoadController.signal : undefined
+            signal: currentLoadController.signal
         });
+        const fetchEndTime = Date.now();
+        console.log(`📥 Fetch completed in ${fetchEndTime - fetchStartTime}ms`);
+        
+        // КРИТИЧНО: Проверяем что это все еще актуальный запрос
+        if (requestId !== loadRequestId) {
+            console.log(`❌ Ignoring old request ${requestId} (current: ${loadRequestId})`);
+            return; // Игнорируем результат старого запроса
+        }
+        
+        // КРИТИЧНО: Проверяем что chatId все еще текущий
+        if (chatId !== currentChatId) {
+            console.log(`❌ Chat changed from ${chatId} to ${currentChatId}`);
+            return; // Пользователь переключился на другой чат
+        }
+        
         const data = await response.json();
         
         if (data.error) {
@@ -505,10 +537,10 @@ async function loadMessages(chatId, silent = false) {
         const oldMessagesCount = messages.length;
         messages = data.messages || [];
         
-        // Сортируем сообщения по времени (старые сверху, новые внизу)
+        // Сортируем сообщения по времени
         messages.sort((a, b) => (a.created || 0) - (b.created || 0));
         
-        // Сохраняем в кэш для быстрого доступа
+        // Сохраняем в кэш
         messagesCache[chatId] = {
             messages: messages,
             chatInfo: data.chat_info,
@@ -516,34 +548,29 @@ async function loadMessages(chatId, silent = false) {
             timestamp: Date.now()
         };
         
-        // Если появились новые сообщения при тихом обновлении
-        if (silent && messages.length > oldMessagesCount) {
-            const isAtBottom = messagesList.scrollHeight - messagesList.scrollTop <= messagesList.clientHeight + 100;
-            if (isAtBottom) {
-                // Автопрокрутка вниз если мы были внизу
-                setTimeout(() => {
-                    messagesList.scrollTo({
-                        top: messagesList.scrollHeight,
-                        behavior: 'smooth'
-                    });
-                }, 100);
-            }
-        }
-        
-        // Сохраняем информацию о чате и текущем пользователе
+        // Сохраняем информацию
         window.currentChatInfo = data.chat_info;
         window.currentUserId = data.current_user_id;
         
-        // Рендерим заголовок и сообщения
+        // Рендерим
         renderChatHeader(data.chat_info);
         renderMessages();
+        
+        // Прокрутка вниз
+        if (!silent) {
+            messagesList.scrollTo({
+                top: messagesList.scrollHeight,
+                behavior: 'auto'
+            });
+        }
+        
+        console.log(`✅ Rendered chat ${chatId}, ${messages.length} messages`);
     } catch (error) {
-        // Игнорируем ошибки отмены (это нормально при быстром переключении)
         if (error.name === 'AbortError') {
-            console.log('Загрузка сообщений отменена (переключение на другой чат)');
+            console.log(`⚠️ Request aborted for ${chatId}`);
             return;
         }
-        if (!silent) showError('Ошибка загрузки сообщений: ' + error.message);
+        if (!silent) showError('Ошибка загрузки: ' + error.message);
     }
 }
 
@@ -565,39 +592,6 @@ function showMessagesSkeleton() {
             <div class="skeleton-message"></div>
         </div>
     `;
-}
-
-// Предзагрузка чата (в фоне, без показа)
-async function prefetchChat(chatId) {
-    // Если уже в кэше - пропускаем
-    if (messagesCache[chatId]) {
-        return;
-    }
-    
-    try {
-        const response = await fetch(`/api/chats/${chatId}/messages`);
-        const data = await response.json();
-        
-        if (data.error) {
-            return; // Тихо игнорируем ошибки предзагрузки
-        }
-        
-        const msgs = data.messages || [];
-        msgs.sort((a, b) => (a.created || 0) - (b.created || 0));
-        
-        // Сохраняем в кэш
-        messagesCache[chatId] = {
-            messages: msgs,
-            chatInfo: data.chat_info,
-            userId: data.current_user_id,
-            timestamp: Date.now()
-        };
-        
-        console.log(`Prefetched chat ${chatId} (${msgs.length} messages)`);
-    } catch (error) {
-        // Тихо игнорируем ошибки
-        console.log(`Prefetch failed for ${chatId}:`, error.message);
-    }
 }
 
 // Отдельная функция для рендеринга заголовка чата
