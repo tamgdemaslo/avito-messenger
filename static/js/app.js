@@ -197,6 +197,19 @@ async function loadChats(silent = false) {
         const newChats = data.chats || [];
         const oldChats = [...chats];
         
+        // ОПТИМИЗАЦИЯ: Предзагрузка первых 3 чатов
+        if (!silent && newChats.length > 0) {
+            setTimeout(() => {
+                // Загружаем первые 3 чата в фоне
+                for (let i = 0; i < Math.min(3, newChats.length); i++) {
+                    const chatId = newChats[i].id;
+                    if (!messagesCache[chatId]) {
+                        prefetchChat(chatId);
+                    }
+                }
+            }, 100);
+        }
+        
         // Проверяем новые сообщения
         let hasNewMessages = false;
         newChats.forEach(newChat => {
@@ -386,7 +399,8 @@ function renderChats() {
         
         return `
             <div class="chat-item ${chat.id === currentChatId ? 'active' : ''} ${unreadClass}" 
-                 onclick="selectChat('${chat.id}')">
+                 onclick="selectChat('${chat.id}')"
+                 onmouseover="prefetchChat('${chat.id}')">
                 <div class="chat-item-avatar-wrapper">
                     ${userAvatar ? `<img src="${escapeHtml(userAvatar)}" alt="${escapeHtml(userName)}" class="chat-item-avatar" onerror="this.style.display='none'">` : '<div class="chat-item-avatar-placeholder"></div>'}
                     ${unreadBadge}
@@ -551,6 +565,39 @@ function showMessagesSkeleton() {
             <div class="skeleton-message"></div>
         </div>
     `;
+}
+
+// Предзагрузка чата (в фоне, без показа)
+async function prefetchChat(chatId) {
+    // Если уже в кэше - пропускаем
+    if (messagesCache[chatId]) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/chats/${chatId}/messages`);
+        const data = await response.json();
+        
+        if (data.error) {
+            return; // Тихо игнорируем ошибки предзагрузки
+        }
+        
+        const msgs = data.messages || [];
+        msgs.sort((a, b) => (a.created || 0) - (b.created || 0));
+        
+        // Сохраняем в кэш
+        messagesCache[chatId] = {
+            messages: msgs,
+            chatInfo: data.chat_info,
+            userId: data.current_user_id,
+            timestamp: Date.now()
+        };
+        
+        console.log(`Prefetched chat ${chatId} (${msgs.length} messages)`);
+    } catch (error) {
+        // Тихо игнорируем ошибки
+        console.log(`Prefetch failed for ${chatId}:`, error.message);
+    }
 }
 
 // Отдельная функция для рендеринга заголовка чата

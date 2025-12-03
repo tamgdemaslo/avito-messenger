@@ -243,7 +243,7 @@ def get_chat_messages(chat_id):
     if chat_id.startswith('tg_'):
         # === TELEGRAM ===
         try:
-            messages_list = telegram_client.get_telegram_messages(chat_id, limit=100)
+            messages_list = telegram_client.get_telegram_messages(chat_id, limit=30)
             
             # Получаем информацию о чате
             telegram_chats = telegram_client.get_telegram_chats(limit=100)
@@ -287,10 +287,10 @@ def get_chat_messages(chat_id):
                     chat_info = chat
                     break
         
-        # Получаем сообщения для чата
+        # Получаем сообщения для чата (только последние 30 для скорости)
         messages_data, error = make_avito_request(
             "GET",
-            f"/messenger/v3/accounts/{user_id}/chats/{chat_id}/messages/"
+            f"/messenger/v3/accounts/{user_id}/chats/{chat_id}/messages/?limit=30"
         )
         
         if error:
