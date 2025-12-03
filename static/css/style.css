@@ -324,6 +324,21 @@ body {
     opacity: 0.5;
 }
 
+.date-delimiter {
+    text-align: center;
+    margin: 24px 0 16px 0;
+}
+
+.date-delimiter span {
+    display: inline-block;
+    padding: 6px 16px;
+    background: #f0f2f5;
+    border-radius: 12px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
 .message-item {
     display: flex;
     gap: 10px;
@@ -402,6 +417,29 @@ body {
 
 .btn-delete-message:hover {
     opacity: 1;
+}
+
+.scroll-to-bottom {
+    position: absolute;
+    bottom: 140px;
+    right: 32px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: white;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    z-index: 999;
+}
+
+.scroll-to-bottom:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
 /* Reply Form - Avito Style */

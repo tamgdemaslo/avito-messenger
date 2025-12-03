@@ -13,6 +13,7 @@ const messageInput = document.getElementById('messageInput');
 const sendBtn = document.getElementById('sendBtn');
 const refreshBtn = document.getElementById('refreshBtn');
 const loadingOverlay = document.getElementById('loadingOverlay');
+const scrollToBottomBtn = document.getElementById('scrollToBottomBtn');
 
 // Глобальная переменная для ID текущего пользователя
 let currentUserId = null;
@@ -39,6 +40,26 @@ function setupEventListeners() {
             sendMessage();
         }
     });
+    
+    // Кнопка прокрутки вниз
+    if (scrollToBottomBtn) {
+        scrollToBottomBtn.addEventListener('click', () => {
+            messagesList.scrollTo({
+                top: messagesList.scrollHeight,
+                behavior: 'smooth'
+            });
+        });
+    }
+    
+    // Показываем/скрываем кнопку прокрутки вниз при скролле
+    if (messagesList) {
+        messagesList.addEventListener('scroll', () => {
+            const isAtBottom = messagesList.scrollHeight - messagesList.scrollTop - messagesList.clientHeight < 100;
+            if (scrollToBottomBtn) {
+                scrollToBottomBtn.style.display = isAtBottom ? 'none' : 'flex';
+            }
+        });
+    }
 }
 
 async function loadChats() {
@@ -276,68 +297,89 @@ function renderMessages() {
         return;
     }
     
-    messagesList.innerHTML = messages.map(msg => {
-        const isOwn = msg.type === 'outgoing' || msg.direction === 'out';
-        const time = msg.created 
-            ? formatTime(msg.created * 1000)
-            : '';
+    let html = '';
+    let lastDate = null;
+    
+    messages.forEach((msg, index) => {
+        // Добавляем разделитель дат
+        const msgDate = new Date(msg.created * 1000);
+        const dateStr = msgDate.toLocaleDateString('ru-RU', { 
+            day: 'numeric', 
+            month: 'long', 
+            year: 'numeric' 
+        });
         
-        // Получаем информацию об авторе сообщения
-        let authorName = 'Пользователь';
-        let authorAvatar = '';
-        
-        if (window.currentChatInfo && window.currentChatInfo.users) {
-            const author = window.currentChatInfo.users.find(u => u.id === msg.author_id);
-            if (author) {
-                authorName = author.name || `ID ${msg.author_id}`;
-                // Извлекаем аватарку из правильной структуры
-                // Аватарки находятся в public_user_profile.avatar
-                if (author.public_user_profile && author.public_user_profile.avatar) {
-                    const avatar = author.public_user_profile.avatar;
-                    if (avatar.images && avatar.images['36x36']) {
-                        authorAvatar = avatar.images['36x36'];
-                    } else if (avatar.default) {
-                        authorAvatar = avatar.default;
-                    }
-                }
-            } else if (msg.author_id === window.currentUserId) {
-                // Это наше сообщение
-                authorName = 'Вы';
-            }
+        if (dateStr !== lastDate) {
+            html += `<div class="date-delimiter"><span>${dateStr}</span></div>`;
+            lastDate = dateStr;
         }
         
-        // Правильно извлекаем текст из структуры Avito API
-        let text = '';
-        if (msg.content && msg.content.text) {
-            text = msg.content.text;
-        } else if (typeof msg.content === 'string') {
-            text = msg.content;
-        } else if (msg.text) {
-            text = msg.text;
-        } else {
-            text = '[Сообщение без текста]';
-        }
-        
-        // Проверяем можно ли удалить сообщение (только свои, не старше часа)
-        const canDelete = isOwn && (Date.now() - msg.created * 1000) < 3600000;
-        
-        return `
-            <div class="message-item ${isOwn ? 'own' : ''}" data-message-id="${msg.id}">
-                ${!isOwn && authorAvatar ? `<img src="${escapeHtml(authorAvatar)}" alt="${escapeHtml(authorName)}" class="message-avatar" onerror="this.style.display='none'">` : ''}
-                <div class="message-content">
-                    <div class="message-item-header">
-                        <div class="message-item-author">${escapeHtml(authorName)}</div>
-                        <div class="message-item-time">${time}</div>
-                        ${canDelete ? `<button class="btn-delete-message" onclick="deleteMessage('${msg.id}')" title="Удалить">🗑️</button>` : ''}
-                    </div>
-                    <div class="message-item-text">${escapeHtml(text)}</div>
-                </div>
-            </div>
-        `;
-    }).join('');
+        html += renderSingleMessage(msg, index);
+    });
+    
+    messagesList.innerHTML = html;
     
     // Прокрутка вниз
     messagesList.scrollTop = messagesList.scrollHeight;
+}
+
+    const isOwn = msg.type === 'outgoing' || msg.direction === 'out';
+    const time = msg.created 
+        ? formatTime(msg.created * 1000)
+        : '';
+    
+    // Получаем информацию об авторе сообщения
+    let authorName = 'Пользователь';
+    let authorAvatar = '';
+    
+    if (window.currentChatInfo && window.currentChatInfo.users) {
+        const author = window.currentChatInfo.users.find(u => u.id === msg.author_id);
+        if (author) {
+            authorName = author.name || `ID ${msg.author_id}`;
+            // Извлекаем аватарку из правильной структуры
+            // Аватарки находятся в public_user_profile.avatar
+            if (author.public_user_profile && author.public_user_profile.avatar) {
+                const avatar = author.public_user_profile.avatar;
+                if (avatar.images && avatar.images['36x36']) {
+                    authorAvatar = avatar.images['36x36'];
+                } else if (avatar.default) {
+                    authorAvatar = avatar.default;
+                }
+            }
+        } else if (msg.author_id === window.currentUserId) {
+            // Это наше сообщение
+            authorName = 'Вы';
+        }
+    }
+    
+    // Правильно извлекаем текст из структуры Avito API
+    let text = '';
+    if (msg.content && msg.content.text) {
+        text = msg.content.text;
+    } else if (typeof msg.content === 'string') {
+        text = msg.content;
+    } else if (msg.text) {
+        text = msg.text;
+    } else {
+        text = '[Сообщение без текста]';
+    }
+    
+    // Проверяем можно ли удалить сообщение (только свои, не старше часа)
+    const canDelete = isOwn && (Date.now() - msg.created * 1000) < 3600000;
+    
+    return `
+        <div class="message-item ${isOwn ? 'own' : ''}" data-message-id="${msg.id}">
+            ${!isOwn && authorAvatar ? `<img src="${escapeHtml(authorAvatar)}" alt="${escapeHtml(authorName)}" class="message-avatar" onerror="this.style.display='none'">` : ''}
+            <div class="message-content">
+                <div class="message-item-header">
+                    ${!isOwn ? `<div class="message-item-author">${escapeHtml(authorName)}</div>` : ''}
+                    <div class="message-item-time">${time}</div>
+                    ${canDelete ? `<button class="btn-delete-message" onclick="deleteMessage('${msg.id}')" title="Удалить">🗑️</button>` : ''}
+                </div>
+                <div class="message-item-text">${escapeHtml(text)}</div>
+            </div>
+        </div>
+    `;
 }
 
 async function sendMessage() {
