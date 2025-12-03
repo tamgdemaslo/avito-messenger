@@ -18,12 +18,61 @@ const scrollToBottomBtn = document.getElementById('scrollToBottomBtn');
 // Глобальная переменная для ID текущего пользователя
 let currentUserId = null;
 
+// Автообновление и уведомления
+let autoRefreshInterval = null;
+let lastMessageCount = {};
+let notificationSound = null;
+
+// Создаем звук уведомления
+function initNotificationSound() {
+    // Используем Web Audio API для создания простого звука
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    
+    notificationSound = () => {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.value = 800;
+        oscillator.type = 'sine';
+        
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+        
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.5);
+    };
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    initNotificationSound();
     loadChats();
     setupEventListeners();
     checkTelegramStatus();
+    startAutoRefresh();
 });
+
+function startAutoRefresh() {
+    // Обновляем чаты каждые 5 секунд
+    autoRefreshInterval = setInterval(async () => {
+        await loadChats(true); // true = тихое обновление (без показа загрузки)
+        
+        // Если открыт чат, обновляем и его сообщения
+        if (currentChatId) {
+            await loadMessages(currentChatId, true);
+        }
+    }, 5000); // 5 секунд
+}
+
+function stopAutoRefresh() {
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+    }
+}
 
 async function checkTelegramStatus() {
     try {
@@ -106,32 +155,109 @@ function setupEventListeners() {
     }
 }
 
-async function loadChats() {
-    showLoading();
+async function loadChats(silent = false) {
+    if (!silent) {
+        showLoading();
+    }
+    
     try {
         const response = await fetch('/api/chats');
         const data = await response.json();
         
         if (data.error) {
-            showError(data.error);
+            if (!silent) showError(data.error);
             return;
         }
         
-        chats = data.chats || [];
-        currentUserId = data.current_user_id; // Сохраняем ID текущего пользователя
+        const newChats = data.chats || [];
+        const oldChats = [...chats];
         
-        // Отладочное логирование в консоль браузера
-        console.log('Current user ID:', currentUserId);
-        if (chats.length > 0) {
-            console.log('First chat structure:', chats[0]);
-            console.log('First chat users:', chats[0].users);
+        // Проверяем новые сообщения
+        let hasNewMessages = false;
+        newChats.forEach(newChat => {
+            const oldChat = oldChats.find(c => c.id === newChat.id);
+            const chatKey = newChat.id;
+            
+            if (newChat.last_message) {
+                const newMessageTime = newChat.last_message.created || 0;
+                const oldMessageTime = oldChat && oldChat.last_message ? (oldChat.last_message.created || 0) : 0;
+                
+                // Если есть новое сообщение
+                if (newMessageTime > oldMessageTime && oldChats.length > 0) {
+                    // Проверяем, что это не наше собственное сообщение
+                    const isOwnMessage = newChat.last_message.direction === 'out' || 
+                                        newChat.last_message.type === 'outgoing';
+                    
+                    if (!isOwnMessage) {
+                        hasNewMessages = true;
+                        console.log('Новое сообщение в чате:', newChat.id);
+                        
+                        // Показываем десктопное уведомление
+                        if ('Notification' in window && Notification.permission === 'granted') {
+                            const userName = getChatUserName(newChat);
+                            const messageText = newChat.last_message.content?.text || newChat.last_message.text || 'Новое сообщение';
+                            new Notification(`${userName}`, {
+                                body: messageText.substring(0, 100),
+                                icon: getChatAvatar(newChat) || '/static/img/notification-icon.png'
+                            });
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Воспроизводим звук если есть новые сообщения
+        if (hasNewMessages && notificationSound) {
+            try {
+                notificationSound();
+            } catch (e) {
+                console.log('Не удалось воспроизвести звук:', e);
+            }
         }
+        
+        chats = newChats;
+        currentUserId = data.current_user_id;
         
         renderChats();
     } catch (error) {
-        showError('Ошибка загрузки чатов: ' + error.message);
+        if (!silent) showError('Ошибка загрузки чатов: ' + error.message);
     } finally {
-        hideLoading();
+        if (!silent) hideLoading();
+    }
+}
+
+// Запрашиваем разрешение на уведомления
+if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+}
+
+// Helper функции для извлечения данных чата
+function getChatUserName(chat) {
+    if (chat.source === 'telegram') {
+        return chat.name || 'Telegram Chat';
+    } else {
+        if (chat.users && chat.users.length > 0) {
+            const otherUser = chat.users.find(u => u.id !== currentUserId) || chat.users[0];
+            return otherUser ? (otherUser.name || `ID ${otherUser.id}`) : 'Пользователь';
+        } else if (chat.user_id) {
+            return `ID ${chat.user_id}`;
+        }
+        return 'Пользователь';
+    }
+}
+
+function getChatAvatar(chat) {
+    if (chat.source === 'telegram') {
+        return chat.avatar || '';
+    } else {
+        if (chat.users && chat.users.length > 0) {
+            const otherUser = chat.users.find(u => u.id !== currentUserId) || chat.users[0];
+            if (otherUser && otherUser.public_user_profile && otherUser.public_user_profile.avatar) {
+                const avatar = otherUser.public_user_profile.avatar;
+                return avatar.images?.['48x48'] || avatar.default || '';
+            }
+        }
+        return '';
     }
 }
 
@@ -211,10 +337,19 @@ function renderChats() {
             ? '<span class="source-badge source-badge-telegram">Telegram</span>'
             : '<span class="source-badge source-badge-avito">Avito</span>';
         
+        // Проверяем непрочитанные сообщения
+        const unreadCount = chat.unread_count || 0;
+        const isUnread = unreadCount > 0 || (lastMessage.direction !== 'out' && lastMessage.type !== 'outgoing' && !lastMessage.isRead);
+        const unreadClass = isUnread ? 'unread' : '';
+        const unreadBadge = unreadCount > 0 ? `<span class="unread-badge">${unreadCount}</span>` : '';
+        
         return `
-            <div class="chat-item ${chat.id === currentChatId ? 'active' : ''}" 
+            <div class="chat-item ${chat.id === currentChatId ? 'active' : ''} ${unreadClass}" 
                  onclick="selectChat('${chat.id}')">
-                ${userAvatar ? `<img src="${escapeHtml(userAvatar)}" alt="${escapeHtml(userName)}" class="chat-item-avatar" onerror="this.style.display='none'">` : '<div class="chat-item-avatar-placeholder"></div>'}
+                <div class="chat-item-avatar-wrapper">
+                    ${userAvatar ? `<img src="${escapeHtml(userAvatar)}" alt="${escapeHtml(userName)}" class="chat-item-avatar" onerror="this.style.display='none'">` : '<div class="chat-item-avatar-placeholder"></div>'}
+                    ${unreadBadge}
+                </div>
                 <div class="chat-item-content">
                     <div class="chat-item-header">
                         <div class="chat-item-name-wrapper">
@@ -251,21 +386,39 @@ async function markChatAsRead(chatId) {
     }
 }
 
-async function loadMessages(chatId) {
-    showLoading();
+async function loadMessages(chatId, silent = false) {
+    if (!silent) {
+        showLoading();
+    }
+    
     try {
         const response = await fetch(`/api/chats/${chatId}/messages`);
         const data = await response.json();
         
         if (data.error) {
-            showError(data.error);
+            if (!silent) showError(data.error);
             return;
         }
         
+        const oldMessagesCount = messages.length;
         messages = data.messages || [];
         
         // Сортируем сообщения по времени (старые сверху, новые внизу)
         messages.sort((a, b) => (a.created || 0) - (b.created || 0));
+        
+        // Если появились новые сообщения при тихом обновлении
+        if (silent && messages.length > oldMessagesCount) {
+            const isAtBottom = messagesList.scrollHeight - messagesList.scrollTop <= messagesList.clientHeight + 100;
+            if (isAtBottom) {
+                // Автопрокрутка вниз если мы были внизу
+                setTimeout(() => {
+                    messagesList.scrollTo({
+                        top: messagesList.scrollHeight,
+                        behavior: 'smooth'
+                    });
+                }, 100);
+            }
+        }
         
         // Сохраняем информацию о чате и текущем пользователе
         window.currentChatInfo = data.chat_info;
@@ -343,9 +496,9 @@ async function loadMessages(chatId) {
         
         renderMessages();
     } catch (error) {
-        showError('Ошибка загрузки сообщений: ' + error.message);
+        if (!silent) showError('Ошибка загрузки сообщений: ' + error.message);
     } finally {
-        hideLoading();
+        if (!silent) hideLoading();
     }
 }
 
