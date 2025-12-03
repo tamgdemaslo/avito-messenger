@@ -14,6 +14,9 @@ const sendBtn = document.getElementById('sendBtn');
 const refreshBtn = document.getElementById('refreshBtn');
 const loadingOverlay = document.getElementById('loadingOverlay');
 
+// Глобальная переменная для ID текущего пользователя
+let currentUserId = null;
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     loadChats();
@@ -50,12 +53,13 @@ async function loadChats() {
         }
         
         chats = data.chats || [];
+        currentUserId = data.current_user_id; // Сохраняем ID текущего пользователя
         
         // Отладочное логирование в консоль браузера
+        console.log('Current user ID:', currentUserId);
         if (chats.length > 0) {
             console.log('First chat structure:', chats[0]);
-            console.log('First chat title:', chats[0].title);
-            console.log('First chat context:', chats[0].context);
+            console.log('First chat users:', chats[0].users);
         }
         
         renderChats();
@@ -91,11 +95,36 @@ function renderChats() {
         }
         
         // Получаем имя пользователя (основное название чата)
+        // Ищем пользователя, который НЕ является текущим (собеседника)
         let userName = 'Пользователь';
         let userAvatar = '';
-        if (chat.users && chat.users.length > 0 && chat.users[0].name) {
-            userName = chat.users[0].name;
-            userAvatar = chat.users[0].image || '';
+        let otherUser = null;
+        
+        if (chat.users && chat.users.length > 0) {
+            // Ищем собеседника (не текущего пользователя)
+            otherUser = chat.users.find(u => u.id !== currentUserId);
+            
+            // Если не нашли, берем первого пользователя
+            if (!otherUser) {
+                otherUser = chat.users[0];
+            }
+            
+            if (otherUser) {
+                userName = otherUser.name || `ID ${otherUser.id}`;
+                // Извлекаем аватарку из правильной структуры
+                if (otherUser.avatar) {
+                    if (otherUser.avatar.images && otherUser.avatar.images['48x48']) {
+                        userAvatar = otherUser.avatar.images['48x48'];
+                    } else if (otherUser.avatar.default) {
+                        userAvatar = otherUser.avatar.default;
+                    }
+                }
+                // Отладочное логирование
+                if (chat.id === chats[0].id) {
+                    console.log('First chat - other user:', otherUser);
+                    console.log('First chat - avatar URL:', userAvatar);
+                }
+            }
         } else if (chat.user_id) {
             userName = `ID ${chat.user_id}`;
         }
@@ -155,9 +184,29 @@ async function loadMessages(chatId) {
         
         if (chat) {
             // Получаем имя пользователя (основное название)
-            if (chat.users && chat.users.length > 0 && chat.users[0].name) {
-                userName = chat.users[0].name;
-                userAvatar = chat.users[0].image || '';
+            // Ищем пользователя, который НЕ является текущим (собеседника)
+            let otherUser = null;
+            
+            if (chat.users && chat.users.length > 0) {
+                // Ищем собеседника (не текущего пользователя)
+                otherUser = chat.users.find(u => u.id !== currentUserId && u.id !== window.currentUserId);
+                
+                // Если не нашли, берем первого пользователя
+                if (!otherUser) {
+                    otherUser = chat.users[0];
+                }
+                
+                if (otherUser) {
+                    userName = otherUser.name || `ID ${otherUser.id}`;
+                    // Извлекаем аватарку из правильной структуры
+                    if (otherUser.avatar) {
+                        if (otherUser.avatar.images && otherUser.avatar.images['48x48']) {
+                            userAvatar = otherUser.avatar.images['48x48'];
+                        } else if (otherUser.avatar.default) {
+                            userAvatar = otherUser.avatar.default;
+                        }
+                    }
+                }
             } else if (chat.user_id) {
                 userName = `ID ${chat.user_id}`;
             }
@@ -211,7 +260,14 @@ function renderMessages() {
             const author = window.currentChatInfo.users.find(u => u.id === msg.author_id);
             if (author) {
                 authorName = author.name || `ID ${msg.author_id}`;
-                authorAvatar = author.image || '';
+                // Извлекаем аватарку из правильной структуры
+                if (author.avatar) {
+                    if (author.avatar.images && author.avatar.images['36x36']) {
+                        authorAvatar = author.avatar.images['36x36'];
+                    } else if (author.avatar.default) {
+                        authorAvatar = author.avatar.default;
+                    }
+                }
             } else if (msg.author_id === window.currentUserId) {
                 // Это наше сообщение
                 authorName = 'Вы';

@@ -174,7 +174,12 @@ def get_chats():
                 print(f"First chat - last_message: {first_chat.get('last_message')}")
                 print(f"First chat sample (full): {json.dumps(first_chat, ensure_ascii=False, indent=2)}")
     
-    return jsonify(chats if chats else {"chats": []})
+    # Добавляем current_user_id к ответу
+    result = chats if chats else {"chats": []}
+    if isinstance(result, dict):
+        result['current_user_id'] = user_id
+    
+    return jsonify(result)
 
 
 @app.route('/api/messages', methods=['GET'])
