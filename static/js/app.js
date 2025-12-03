@@ -3,6 +3,7 @@
 let currentChatId = null;
 let chats = [];
 let messages = [];
+let messagesCache = {}; // Кэш сообщений для быстрого переключения
 
 // DOM Elements
 const chatsList = document.getElementById('chatsList');
@@ -438,10 +439,24 @@ async function markChatAsRead(chatId) {
 }
 
 async function loadMessages(chatId, silent = false) {
-    if (!silent) {
-        showLoading();
+    // Проверяем кэш - если есть, показываем сразу (мгновенно)
+    if (messagesCache[chatId] && !silent) {
+        messages = messagesCache[chatId].messages;
+        window.currentChatInfo = messagesCache[chatId].chatInfo;
+        window.currentUserId = messagesCache[chatId].userId;
+        
+        // Мгновенно показываем закэшированные данные
+        renderChatHeader(messagesCache[chatId].chatInfo);
+        renderMessages();
+        
+        // Прокручиваем вниз
+        messagesList.scrollTo({
+            top: messagesList.scrollHeight,
+            behavior: 'auto' // Без анимации для скорости
+        });
     }
     
+    // Загружаем свежие данные в фоне
     try {
         const response = await fetch(`/api/chats/${chatId}/messages`);
         const data = await response.json();
@@ -456,6 +471,14 @@ async function loadMessages(chatId, silent = false) {
         
         // Сортируем сообщения по времени (старые сверху, новые внизу)
         messages.sort((a, b) => (a.created || 0) - (b.created || 0));
+        
+        // Сохраняем в кэш для быстрого доступа
+        messagesCache[chatId] = {
+            messages: messages,
+            chatInfo: data.chat_info,
+            userId: data.current_user_id,
+            timestamp: Date.now()
+        };
         
         // Если появились новые сообщения при тихом обновлении
         if (silent && messages.length > oldMessagesCount) {
@@ -475,81 +498,83 @@ async function loadMessages(chatId, silent = false) {
         window.currentChatInfo = data.chat_info;
         window.currentUserId = data.current_user_id;
         
-        // Получаем информацию о чате
-        const chat = chats.find(c => c.id === chatId) || data.chat_info;
-        let userName = 'Пользователь';
-        let userAvatar = '';
-        let itemTitle = '';
-        
-        if (chat) {
-            // === TELEGRAM ===
-            if (chat.source === 'telegram') {
-                userName = chat.name || 'Telegram Chat';
-                userAvatar = chat.avatar || '';
-                itemTitle = chat.type === 'channel' ? 'Канал' : (chat.type === 'group' ? 'Группа' : '');
-            }
-            // === AVITO ===
-            else {
-                let otherUser = null;
-                
-                if (chat.users && chat.users.length > 0) {
-                    // Ищем собеседника (не текущего пользователя)
-                    otherUser = chat.users.find(u => u.id !== currentUserId && u.id !== window.currentUserId);
-                    
-                    // Если не нашли, берем первого пользователя
-                    if (!otherUser) {
-                        otherUser = chat.users[0];
-                    }
-                    
-                    if (otherUser) {
-                        userName = otherUser.name || `ID ${otherUser.id}`;
-                        // Извлекаем аватарку из правильной структуры
-                        if (otherUser.public_user_profile && otherUser.public_user_profile.avatar) {
-                            const avatar = otherUser.public_user_profile.avatar;
-                            if (avatar.images && avatar.images['48x48']) {
-                                userAvatar = avatar.images['48x48'];
-                            } else if (avatar.default) {
-                                userAvatar = avatar.default;
-                            }
-                        }
-                    }
-                } else if (chat.user_id) {
-                    userName = `ID ${chat.user_id}`;
-                }
-                
-                // Получаем название объявления (подзаголовок)
-                if (chat.context && chat.context.value && chat.context.value.title) {
-                    itemTitle = chat.context.value.title;
-                }
-            }
-        }
-        
-        // Формируем заголовок с аватаркой, именем пользователя и названием объявления
-        messagesHeader.innerHTML = `
-            <div class="chat-header-wrapper">
-                ${userAvatar ? `<img src="${escapeHtml(userAvatar)}" alt="${escapeHtml(userName)}" class="chat-avatar" onerror="this.style.display='none'">` : ''}
-                <div class="chat-header-text">
-                    <h2>${escapeHtml(userName)}</h2>
-                    ${itemTitle ? `<div class="chat-subtitle">${escapeHtml(itemTitle)}</div>` : ''}
-                </div>
-            </div>
-        `;
-        
-        // Показываем кнопку блокировки и привязываем её к пользователю
-        const blockBtn = document.getElementById('blockUserBtn');
-        if (blockBtn && chat && chat.users && chat.users.length > 0) {
-            const otherUser = chat.users.find(u => u.id !== currentUserId && u.id !== window.currentUserId);
-            if (otherUser) {
-                blockBtn.style.display = 'inline-flex';
-                blockBtn.onclick = () => blockUser(otherUser.id);
-            }
-        }
-        
+        // Рендерим заголовок и сообщения
+        renderChatHeader(data.chat_info);
         renderMessages();
     } catch (error) {
         if (!silent) showError('Ошибка загрузки сообщений: ' + error.message);
-    } finally {
-        if (!silent) hideLoading();
+    }
+}
+
+// Отдельная функция для рендеринга заголовка чата
+function renderChatHeader(chatInfo) {
+    const chat = chats.find(c => c.id === currentChatId) || chatInfo;
+    let userName = 'Пользователь';
+    let userAvatar = '';
+    let itemTitle = '';
+    
+    if (chat) {
+        // === TELEGRAM ===
+        if (chat.source === 'telegram') {
+            userName = chat.name || 'Telegram Chat';
+            userAvatar = chat.avatar || '';
+            itemTitle = chat.type === 'channel' ? 'Канал' : (chat.type === 'group' ? 'Группа' : '');
+        }
+        // === AVITO ===
+        else {
+            let otherUser = null;
+            
+            if (chat.users && chat.users.length > 0) {
+                // Ищем собеседника (не текущего пользователя)
+                otherUser = chat.users.find(u => u.id !== currentUserId && u.id !== window.currentUserId);
+                
+                // Если не нашли, берем первого пользователя
+                if (!otherUser) {
+                    otherUser = chat.users[0];
+                }
+                
+                if (otherUser) {
+                    userName = otherUser.name || `ID ${otherUser.id}`;
+                    // Извлекаем аватарку из правильной структуры
+                    if (otherUser.public_user_profile && otherUser.public_user_profile.avatar) {
+                        const avatar = otherUser.public_user_profile.avatar;
+                        if (avatar.images && avatar.images['48x48']) {
+                            userAvatar = avatar.images['48x48'];
+                        } else if (avatar.default) {
+                            userAvatar = avatar.default;
+                        }
+                    }
+                }
+            } else if (chat.user_id) {
+                userName = `ID ${chat.user_id}`;
+            }
+            
+            // Получаем название объявления (подзаголовок)
+            if (chat.context && chat.context.value && chat.context.value.title) {
+                itemTitle = chat.context.value.title;
+            }
+        }
+    }
+    
+    // Формируем заголовок с аватаркой, именем пользователя и названием объявления
+    messagesHeader.innerHTML = `
+        <div class="chat-header-wrapper">
+            ${userAvatar ? `<img src="${escapeHtml(userAvatar)}" alt="${escapeHtml(userName)}" class="chat-avatar" onerror="this.style.display='none'">` : ''}
+            <div class="chat-header-text">
+                <h2>${escapeHtml(userName)}</h2>
+                ${itemTitle ? `<div class="chat-subtitle">${escapeHtml(itemTitle)}</div>` : ''}
+            </div>
+        </div>
+    `;
+    
+    // Показываем кнопку блокировки и привязываем её к пользователю
+    const blockBtn = document.getElementById('blockUserBtn');
+    if (blockBtn && chat && chat.users && chat.users.length > 0) {
+        const otherUser = chat.users.find(u => u.id !== currentUserId && u.id !== window.currentUserId);
+        if (otherUser) {
+            blockBtn.style.display = 'inline-flex';
+            blockBtn.onclick = () => blockUser(otherUser.id);
+        }
     }
 }
 
