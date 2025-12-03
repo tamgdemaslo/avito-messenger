@@ -155,17 +155,14 @@ async def get_telegram_chats_async(limit=100):
                     'from_id': msg.sender_id
                 }
             
-            # Аватарка
+            # Аватарка - НЕ загружаем файлы, используем заглушки
+            # Загрузка 100 аватарок занимает 20-30 секунд!
+            # Вместо этого используем initials/placeholder
             if hasattr(entity, 'photo') and entity.photo:
-                try:
-                    photo_path = await client.download_profile_photo(
-                        entity,
-                        file=f'static/avatars/tg_{dialog.id}.jpg'
-                    )
-                    if photo_path:
-                        chat_data['avatar'] = f'/static/avatars/tg_{dialog.id}.jpg'
-                except Exception as e:
-                    print(f"Не удалось загрузить аватарку для {dialog.name}: {e}")
+                # Просто помечаем что аватарка есть, но не загружаем
+                chat_data['has_photo'] = True
+            else:
+                chat_data['has_photo'] = False
             
             chats.append(chat_data)
         except Exception as e:
@@ -349,17 +346,8 @@ async def get_telegram_user_info_async(user_id):
             'phone': entity.phone if hasattr(entity, 'phone') else None
         }
         
-        # Аватарка
-        if hasattr(entity, 'photo') and entity.photo:
-            try:
-                photo_path = await client.download_profile_photo(
-                    entity,
-                    file=f'static/avatars/tg_user_{user_id}.jpg'
-                )
-                if photo_path:
-                    user_info['avatar'] = f'/static/avatars/tg_user_{user_id}.jpg'
-            except:
-                pass
+        # Аватарка - не загружаем для скорости
+        user_info['has_photo'] = hasattr(entity, 'photo') and entity.photo is not None
         
         return user_info
     except Exception as e:

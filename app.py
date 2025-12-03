@@ -166,7 +166,7 @@ def get_chats():
     
     # === TELEGRAM ЧАТЫ ===
     try:
-        telegram_chats = telegram_client.get_telegram_chats(limit=100)
+        telegram_chats = telegram_client.get_telegram_chats(limit=30)
         if telegram_chats:
             print(f"Loaded {len(telegram_chats)} Telegram chats")
             all_chats.extend(telegram_chats)
