@@ -239,6 +239,15 @@ def get_chat_messages(chat_id):
         print(f"No user ID in profile: {profile}")
         return jsonify({"error": "Could not get user ID"}), 500
     
+    # Получаем информацию о чате (для пользователей)
+    chats_data, chats_error = make_avito_request("GET", f"/messenger/v2/accounts/{user_id}/chats")
+    chat_info = None
+    if not chats_error and chats_data and 'chats' in chats_data:
+        for chat in chats_data['chats']:
+            if chat.get('id') == chat_id:
+                chat_info = chat
+                break
+    
     # Получаем сообщения для чата
     messages_data, error = make_avito_request(
         "GET",
@@ -266,7 +275,9 @@ def get_chat_messages(chat_id):
     
     return jsonify({
         "messages": messages_list,
-        "chat_id": chat_id
+        "chat_id": chat_id,
+        "chat_info": chat_info,
+        "current_user_id": user_id
     })
 
 

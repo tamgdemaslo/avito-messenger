@@ -92,8 +92,10 @@ function renderChats() {
         
         // Получаем имя пользователя (основное название чата)
         let userName = 'Пользователь';
+        let userAvatar = '';
         if (chat.users && chat.users.length > 0 && chat.users[0].name) {
             userName = chat.users[0].name;
+            userAvatar = chat.users[0].image || '';
         } else if (chat.user_id) {
             userName = `ID ${chat.user_id}`;
         }
@@ -107,12 +109,15 @@ function renderChats() {
         return `
             <div class="chat-item ${chat.id === currentChatId ? 'active' : ''}" 
                  onclick="selectChat('${chat.id}')">
-                <div class="chat-item-header">
-                    <div class="chat-item-name">${escapeHtml(userName)}</div>
-                    <div class="chat-item-time">${time}</div>
+                ${userAvatar ? `<img src="${escapeHtml(userAvatar)}" alt="${escapeHtml(userName)}" class="chat-item-avatar" onerror="this.style.display='none'">` : '<div class="chat-item-avatar-placeholder"></div>'}
+                <div class="chat-item-content">
+                    <div class="chat-item-header">
+                        <div class="chat-item-name">${escapeHtml(userName)}</div>
+                        <div class="chat-item-time">${time}</div>
+                    </div>
+                    ${itemTitle ? `<div class="chat-item-subtitle">${escapeHtml(itemTitle)}</div>` : ''}
+                    <div class="chat-item-preview">${escapeHtml(preview)}</div>
                 </div>
-                ${itemTitle ? `<div class="chat-item-subtitle">${escapeHtml(itemTitle)}</div>` : ''}
-                <div class="chat-item-preview">${escapeHtml(preview)}</div>
             </div>
         `;
     }).join('');
@@ -138,15 +143,21 @@ async function loadMessages(chatId) {
         
         messages = data.messages || [];
         
+        // Сохраняем информацию о чате и текущем пользователе
+        window.currentChatInfo = data.chat_info;
+        window.currentUserId = data.current_user_id;
+        
         // Получаем информацию о чате
-        const chat = chats.find(c => c.id === chatId);
+        const chat = chats.find(c => c.id === chatId) || data.chat_info;
         let userName = 'Пользователь';
+        let userAvatar = '';
         let itemTitle = '';
         
         if (chat) {
             // Получаем имя пользователя (основное название)
             if (chat.users && chat.users.length > 0 && chat.users[0].name) {
                 userName = chat.users[0].name;
+                userAvatar = chat.users[0].image || '';
             } else if (chat.user_id) {
                 userName = `ID ${chat.user_id}`;
             }
@@ -157,10 +168,15 @@ async function loadMessages(chatId) {
             }
         }
         
-        // Формируем заголовок с именем пользователя и названием объявления
+        // Формируем заголовок с аватаркой, именем пользователя и названием объявления
         messagesHeader.innerHTML = `
-            <h2>${escapeHtml(userName)}</h2>
-            ${itemTitle ? `<div class="chat-subtitle">${escapeHtml(itemTitle)}</div>` : ''}
+            <div class="chat-header-wrapper">
+                ${userAvatar ? `<img src="${escapeHtml(userAvatar)}" alt="${escapeHtml(userName)}" class="chat-avatar" onerror="this.style.display='none'">` : ''}
+                <div class="chat-header-text">
+                    <h2>${escapeHtml(userName)}</h2>
+                    ${itemTitle ? `<div class="chat-subtitle">${escapeHtml(itemTitle)}</div>` : ''}
+                </div>
+            </div>
         `;
         
         renderMessages();
@@ -186,7 +202,21 @@ function renderMessages() {
         const time = msg.created 
             ? formatTime(msg.created * 1000)
             : '';
-        const author = msg.author_id || msg.author || msg.user_id || 'Пользователь';
+        
+        // Получаем информацию об авторе сообщения
+        let authorName = 'Пользователь';
+        let authorAvatar = '';
+        
+        if (window.currentChatInfo && window.currentChatInfo.users) {
+            const author = window.currentChatInfo.users.find(u => u.id === msg.author_id);
+            if (author) {
+                authorName = author.name || `ID ${msg.author_id}`;
+                authorAvatar = author.image || '';
+            } else if (msg.author_id === window.currentUserId) {
+                // Это наше сообщение
+                authorName = 'Вы';
+            }
+        }
         
         // Правильно извлекаем текст из структуры Avito API
         let text = '';
@@ -202,11 +232,14 @@ function renderMessages() {
         
         return `
             <div class="message-item ${isOwn ? 'own' : ''}">
-                <div class="message-item-header">
-                    <div class="message-item-author">${escapeHtml(String(author))}</div>
-                    <div class="message-item-time">${time}</div>
+                ${!isOwn && authorAvatar ? `<img src="${escapeHtml(authorAvatar)}" alt="${escapeHtml(authorName)}" class="message-avatar" onerror="this.style.display='none'">` : ''}
+                <div class="message-content">
+                    <div class="message-item-header">
+                        <div class="message-item-author">${escapeHtml(authorName)}</div>
+                        <div class="message-item-time">${time}</div>
+                    </div>
+                    <div class="message-item-text">${escapeHtml(text)}</div>
                 </div>
-                <div class="message-item-text">${escapeHtml(text)}</div>
             </div>
         `;
     }).join('');
