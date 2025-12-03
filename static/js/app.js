@@ -94,7 +94,7 @@ async function selectChat(chatId) {
 async function loadMessages(chatId) {
     showLoading();
     try {
-        const response = await fetch('/api/messages');
+        const response = await fetch(`/api/chats/${chatId}/messages`);
         const data = await response.json();
         
         if (data.error) {
@@ -102,12 +102,7 @@ async function loadMessages(chatId) {
             return;
         }
         
-        // Фильтруем сообщения для выбранного чата
-        const chatMessages = (data.messages || []).filter(
-            msg => msg.chat_id === chatId
-        );
-        
-        messages = chatMessages;
+        messages = data.messages || [];
         
         // Получаем информацию о чате
         const chat = chats.find(c => c.id === chatId);

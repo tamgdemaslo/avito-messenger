@@ -144,31 +144,16 @@ def get_chats():
     # Сначала получаем user_id
     profile, error = make_avito_request("GET", "/core/v1/accounts/self")
     if error:
-        print(f"Error getting profile: {error}")
         return jsonify({"error": error}), 500
     
     user_id = profile.get('id')
     if not user_id:
-        print(f"No user ID in profile: {profile}")
         return jsonify({"error": "Could not get user ID"}), 500
-    
-    print(f"Got user_id: {user_id}")
     
     # Получаем чаты
     chats, error = make_avito_request("GET", f"/messenger/v2/accounts/{user_id}/chats")
     if error:
-        print(f"Error getting chats: {error}")
         return jsonify({"error": error}), 500
-    
-    # Логируем структуру ответа для отладки
-    print(f"Chats response type: {type(chats)}")
-    if isinstance(chats, dict):
-        print(f"Chats keys: {chats.keys()}")
-        if 'chats' in chats:
-            print(f"Number of chats: {len(chats['chats'])}")
-            if chats['chats']:
-                print(f"First chat keys: {chats['chats'][0].keys()}")
-                print(f"First chat sample: {json.dumps(chats['chats'][0], ensure_ascii=False, indent=2)}")
     
     return jsonify(chats if chats else {"chats": []})
 
@@ -216,53 +201,6 @@ def get_messages():
     return jsonify({
         "messages": all_messages,
         "chats": chats.get('chats', []) if chats else []
-    })
-
-
-@app.route('/api/chats/<chat_id>/messages', methods=['GET'])
-def get_chat_messages(chat_id):
-    """Получить сообщения конкретного чата"""
-    print(f"Fetching messages for chat_id: {chat_id}")
-    
-    # Получаем user_id из профиля
-    profile, error = make_avito_request("GET", "/core/v1/accounts/self")
-    if error:
-        print(f"Error getting profile: {error}")
-        return jsonify({"error": error}), 500
-    
-    user_id = profile.get('id')
-    if not user_id:
-        print(f"No user ID in profile: {profile}")
-        return jsonify({"error": "Could not get user ID"}), 500
-    
-    # Получаем сообщения для чата
-    messages_data, error = make_avito_request(
-        "GET",
-        f"/messenger/v3/accounts/{user_id}/chats/{chat_id}/messages/"
-    )
-    
-    if error:
-        print(f"Error getting messages: {error}")
-        return jsonify({"error": error}), 500
-    
-    print(f"Messages response type: {type(messages_data)}")
-    
-    # Обрабатываем ответ - API может вернуть либо список, либо объект с полем messages
-    if isinstance(messages_data, dict):
-        print(f"Messages dict keys: {messages_data.keys()}")
-        messages_list = messages_data.get('messages', [])
-    elif isinstance(messages_data, list):
-        messages_list = messages_data
-    else:
-        messages_list = []
-    
-    print(f"Number of messages: {len(messages_list)}")
-    if messages_list:
-        print(f"First message sample: {json.dumps(messages_list[0], ensure_ascii=False, indent=2)}")
-    
-    return jsonify({
-        "messages": messages_list,
-        "chat_id": chat_id
     })
 
 
