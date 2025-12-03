@@ -37,7 +37,7 @@ def after_request(response):
 AVITO_CLIENT_ID = os.environ.get('AVITO_CLIENT_ID', "1cIpj04gx6i3v7Ym5wNj")
 AVITO_CLIENT_SECRET = os.environ.get('AVITO_CLIENT_SECRET', "IncASFD6M42y86XctwJitqCwHVE5y7AivuOgkfoK")
 AVITO_REDIRECT_URI = os.environ.get('AVITO_REDIRECT_URI', "https://avito.tamgdemaslocrm.ru/callback")
-AVITO_AUTH_URL = "https://avito.ru/oauth"
+AVITO_AUTH_URL = "https://www.avito.ru/oauth"
 AVITO_API_URL = "https://api.avito.ru"
 
 # Хранилище токенов (в продакшене использовать БД)
@@ -112,7 +112,7 @@ def test_oauth():
         'redirect_uri': AVITO_REDIRECT_URI,
         'scope': scopes
     }
-    auth_url = f"{AVITO_AUTH_URL}/authorize?{urlencode(params)}"
+    auth_url = f"{AVITO_AUTH_URL}?{urlencode(params)}"
     
     return render_template('test_oauth.html',
                          client_id=AVITO_CLIENT_ID,
@@ -148,7 +148,7 @@ def login():
         'scope': scopes
     }
     
-    auth_url = f"{AVITO_AUTH_URL}/authorize?{urlencode(params)}"
+    auth_url = f"{AVITO_AUTH_URL}?{urlencode(params)}"
     
     # Логируем для отладки
     print("=" * 60)
