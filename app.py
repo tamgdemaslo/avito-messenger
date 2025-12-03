@@ -168,7 +168,11 @@ def get_chats():
             print(f"Number of chats: {len(chats['chats'])}")
             if chats['chats']:
                 print(f"First chat keys: {chats['chats'][0].keys()}")
-                print(f"First chat sample: {json.dumps(chats['chats'][0], ensure_ascii=False, indent=2)}")
+                first_chat = chats['chats'][0]
+                print(f"First chat - title: {first_chat.get('title')}")
+                print(f"First chat - context: {first_chat.get('context')}")
+                print(f"First chat - last_message: {first_chat.get('last_message')}")
+                print(f"First chat sample (full): {json.dumps(first_chat, ensure_ascii=False, indent=2)}")
     
     return jsonify(chats if chats else {"chats": []})
 
