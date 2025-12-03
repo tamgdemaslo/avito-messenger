@@ -256,11 +256,14 @@ body {
     display: flex;
     flex-direction: column;
     background: var(--surface);
+    position: relative;
+    overflow: hidden;
 }
 
 .messages-header {
     padding: 16px 24px;
     border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
 }
 
 .chat-header-wrapper {
@@ -295,10 +298,12 @@ body {
 .messages-list {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 24px;
     display: flex;
     flex-direction: column;
     gap: 16px;
+    min-height: 0;
 }
 
 .empty-state {
@@ -400,6 +405,11 @@ body {
     padding: 20px 24px;
     border-top: 1px solid var(--border-color);
     background: var(--surface);
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    flex-shrink: 0;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .reply-actions {
