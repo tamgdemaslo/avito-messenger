@@ -1,0 +1,17 @@
+Скопируйте эти переменные в Railway Variables:
+
+AVITO_CLIENT_ID
+1cIpj04gx6i3v7Ym5wNj
+
+AVITO_CLIENT_SECRET
+IncASFD6M42y86XctwJitqCwHVE5y7AivuOgkfoK
+
+AVITO_REDIRECT_URI
+https://avito.tamgdemaslocrm.ru/callback
+
+SECRET_KEY
+1742fa5ec98fb6f14b29dc88d7d5933aca96e2fcd22a4a4f3843c0c276b841e2
+
+FLASK_ENV
+production
+
