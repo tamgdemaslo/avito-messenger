@@ -323,6 +323,7 @@ function renderMessages() {
     messagesList.scrollTop = messagesList.scrollHeight;
 }
 
+function renderSingleMessage(msg, index) {
     const isOwn = msg.type === 'outgoing' || msg.direction === 'out';
     const time = msg.created 
         ? formatTime(msg.created * 1000)
