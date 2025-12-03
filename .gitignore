@@ -36,5 +36,10 @@ test_server.py
 check.py
 *.tmp
 
+# Telegram sessions
+*.session
+*.session-journal
+avito_crm_session.session
+
 
 
