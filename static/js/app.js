@@ -22,7 +22,51 @@ let currentUserId = null;
 document.addEventListener('DOMContentLoaded', () => {
     loadChats();
     setupEventListeners();
+    checkTelegramStatus();
 });
+
+async function checkTelegramStatus() {
+    try {
+        const response = await fetch('/api/telegram/status');
+        const data = await response.json();
+        
+        if (!data.authorized) {
+            // Показываем уведомление, если Telegram не авторизован
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #0088cc;
+                color: white;
+                padding: 12px 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                z-index: 10000;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                font-size: 14px;
+                max-width: 400px;
+            `;
+            notification.innerHTML = `
+                <span>📱 Telegram не подключен</span>
+                <a href="/telegram/auth" style="color: white; text-decoration: underline; font-weight: 600;">Авторизоваться</a>
+                <button onclick="this.parentElement.remove()" style="background: none; border: none; color: white; cursor: pointer; font-size: 18px; margin-left: auto;">×</button>
+            `;
+            document.body.appendChild(notification);
+            
+            // Автоматически скрываем через 10 секунд
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.remove();
+                }
+            }, 10000);
+        }
+    } catch (error) {
+        console.log('Telegram status check failed:', error);
+    }
+}
 
 function setupEventListeners() {
     refreshBtn.addEventListener('click', () => {

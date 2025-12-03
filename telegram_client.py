@@ -39,90 +39,134 @@ async def init_telegram_client():
     """Инициализация Telegram клиента"""
     global telegram_client
     
-    if telegram_client and telegram_client.is_connected():
+    try:
+        # Проверяем существующий клиент
+        if telegram_client:
+            try:
+                if telegram_client.is_connected():
+                    # Проверяем авторизацию
+                    if await telegram_client.is_user_authorized():
+                        return telegram_client
+            except:
+                # Клиент не подключен, пересоздаем
+                telegram_client = None
+        
+        # Создаем новый клиент
+        telegram_client = TelegramClient(
+            'avito_crm_session',
+            TELEGRAM_API_ID,
+            TELEGRAM_API_HASH
+        )
+        
+        await telegram_client.connect()
+        
+        # Проверяем авторизацию
+        if not await telegram_client.is_user_authorized():
+            print(f"Telegram: требуется авторизация для {TELEGRAM_PHONE}")
+            await telegram_client.disconnect()
+            return None
+        
+        print("Telegram: клиент успешно подключен и авторизован")
         return telegram_client
-    
-    telegram_client = TelegramClient(
-        'avito_crm_session',
-        TELEGRAM_API_ID,
-        TELEGRAM_API_HASH,
-        loop=get_event_loop()
-    )
-    
-    await telegram_client.connect()
-    
-    # Проверяем авторизацию
-    if not await telegram_client.is_user_authorized():
-        print(f"Telegram: требуется авторизация для {TELEGRAM_PHONE}")
-        # Авторизация будет запрошена через отдельный endpoint
+    except Exception as e:
+        print(f"Telegram: ошибка инициализации клиента: {e}")
         return None
-    
-    print("Telegram: клиент успешно подключен")
-    return telegram_client
 
 
 def run_async(coro):
     """Запуск async функции синхронно"""
-    loop = get_event_loop()
-    return loop.run_until_complete(coro)
+    # Создаем новый event loop для каждого запроса (Flask/gunicorn синхронный)
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
 
 
 async def get_telegram_chats_async(limit=100):
     """Получить список чатов Telegram"""
-    client = await init_telegram_client()
-    if not client:
-        return []
-    
-    dialogs = await client.get_dialogs(limit=limit)
     chats = []
     
+    try:
+        client = await init_telegram_client()
+        if not client:
+            print("Telegram: клиент не авторизован, пропускаем загрузку чатов")
+            return []
+        
+        # Проверяем авторизацию еще раз
+        if not await client.is_user_authorized():
+            print("Telegram: пользователь не авторизован")
+            return []
+        
+        try:
+            dialogs = await client.get_dialogs(limit=limit)
+        except Exception as e:
+            error_msg = str(e)
+            if 'not registered' in error_msg or 'not authorized' in error_msg.lower():
+                print("Telegram: требуется авторизация (ключ не зарегистрирован)")
+                return []
+            raise  # Пробрасываем другие ошибки
+        
+    except Exception as e:
+        error_msg = str(e)
+        if 'not registered' in error_msg or 'not authorized' in error_msg.lower():
+            print("Telegram: требуется авторизация")
+        else:
+            print(f"Telegram: ошибка при получении чатов: {e}")
+        return []
+    
     for dialog in dialogs:
-        entity = dialog.entity
-        
-        # Получаем информацию о чате
-        chat_data = {
-            'id': f'tg_{dialog.id}',
-            'source': 'telegram',
-            'original_id': dialog.id,
-            'name': dialog.name or 'Без названия',
-            'unread_count': dialog.unread_count,
-            'created': int(dialog.date.timestamp()) if dialog.date else 0,
-            'updated': int(dialog.date.timestamp()) if dialog.date else 0,
-        }
-        
-        # Последнее сообщение
-        if dialog.message:
-            msg = dialog.message
-            chat_data['last_message'] = {
-                'id': msg.id,
-                'text': msg.message or '',
-                'created': int(msg.date.timestamp()) if msg.date else 0,
-                'from_id': msg.sender_id
+        try:
+            entity = dialog.entity
+            
+            # Получаем информацию о чате
+            chat_data = {
+                'id': f'tg_{dialog.id}',
+                'source': 'telegram',
+                'original_id': dialog.id,
+                'name': dialog.name or 'Без названия',
+                'unread_count': dialog.unread_count,
+                'created': int(dialog.date.timestamp()) if dialog.date else 0,
+                'updated': int(dialog.date.timestamp()) if dialog.date else 0,
             }
-        
-        # Аватарка
-        if hasattr(entity, 'photo') and entity.photo:
-            try:
-                photo_path = await client.download_profile_photo(
-                    entity,
-                    file=f'static/avatars/tg_{dialog.id}.jpg'
-                )
-                if photo_path:
-                    chat_data['avatar'] = f'/static/avatars/tg_{dialog.id}.jpg'
-            except Exception as e:
-                print(f"Не удалось загрузить аватарку для {dialog.name}: {e}")
-        
-        # Тип чата
-        if isinstance(entity, User):
-            chat_data['type'] = 'private'
-            chat_data['is_bot'] = entity.bot if hasattr(entity, 'bot') else False
-        elif isinstance(entity, Chat):
-            chat_data['type'] = 'group'
-        elif isinstance(entity, Channel):
-            chat_data['type'] = 'channel'
-            chat_data['is_broadcast'] = entity.broadcast if hasattr(entity, 'broadcast') else False
-        
-        chats.append(chat_data)
+            
+            # Последнее сообщение
+            if dialog.message:
+                msg = dialog.message
+                chat_data['last_message'] = {
+                    'id': msg.id,
+                    'text': msg.message or '',
+                    'created': int(msg.date.timestamp()) if msg.date else 0,
+                    'from_id': msg.sender_id
+                }
+            
+            # Аватарка
+            if hasattr(entity, 'photo') and entity.photo:
+                try:
+                    photo_path = await client.download_profile_photo(
+                        entity,
+                        file=f'static/avatars/tg_{dialog.id}.jpg'
+                    )
+                    if photo_path:
+                        chat_data['avatar'] = f'/static/avatars/tg_{dialog.id}.jpg'
+                except Exception as e:
+                    print(f"Не удалось загрузить аватарку для {dialog.name}: {e}")
+            
+            # Тип чата
+            if isinstance(entity, User):
+                chat_data['type'] = 'private'
+                chat_data['is_bot'] = entity.bot if hasattr(entity, 'bot') else False
+            elif isinstance(entity, Chat):
+                chat_data['type'] = 'group'
+            elif isinstance(entity, Channel):
+                chat_data['type'] = 'channel'
+                chat_data['is_broadcast'] = entity.broadcast if hasattr(entity, 'broadcast') else False
+            
+            chats.append(chat_data)
+        except Exception as e:
+            print(f"Ошибка обработки диалога {dialog.id}: {e}")
+            continue
     
     return chats
 
@@ -200,16 +244,27 @@ async def authorize_telegram_async(phone, code=None, password=None):
     """Авторизация в Telegram"""
     global telegram_client
     
-    telegram_client = TelegramClient(
-        'avito_crm_session',
-        TELEGRAM_API_ID,
-        TELEGRAM_API_HASH,
-        loop=get_event_loop()
-    )
-    
-    await telegram_client.connect()
-    
-    if not await telegram_client.is_user_authorized():
+    try:
+        # Закрываем существующий клиент, если есть
+        if telegram_client:
+            try:
+                await telegram_client.disconnect()
+            except:
+                pass
+        
+        # Создаем новый клиент
+        telegram_client = TelegramClient(
+            'avito_crm_session',
+            TELEGRAM_API_ID,
+            TELEGRAM_API_HASH
+        )
+        
+        await telegram_client.connect()
+        
+        # Проверяем, авторизован ли уже
+        if await telegram_client.is_user_authorized():
+            return {'status': 'already_authorized', 'message': 'Уже авторизованы'}
+        
         if not code:
             # Отправляем код
             await telegram_client.send_code_request(phone)
@@ -218,11 +273,19 @@ async def authorize_telegram_async(phone, code=None, password=None):
             # Авторизуемся с кодом
             try:
                 await telegram_client.sign_in(phone, code, password=password)
-                return {'status': 'authorized', 'message': 'Авторизация успешна'}
+                # Проверяем успешность
+                if await telegram_client.is_user_authorized():
+                    return {'status': 'authorized', 'message': 'Авторизация успешна'}
+                else:
+                    return {'status': 'error', 'message': 'Авторизация не удалась'}
             except Exception as e:
-                return {'status': 'error', 'message': str(e)}
-    
-    return {'status': 'already_authorized', 'message': 'Уже авторизованы'}
+                error_msg = str(e)
+                # Проверяем, нужен ли пароль 2FA
+                if 'password' in error_msg.lower() or '2FA' in error_msg:
+                    return {'status': 'password_required', 'message': 'Требуется пароль 2FA'}
+                return {'status': 'error', 'message': error_msg}
+    except Exception as e:
+        return {'status': 'error', 'message': f'Ошибка авторизации: {str(e)}'}
 
 
 async def get_telegram_user_info_async(user_id):
