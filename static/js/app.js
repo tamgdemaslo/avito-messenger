@@ -90,39 +90,28 @@ function renderChats() {
             preview = lastMessage.text;
         }
         
-        // Получаем название чата из структуры Avito API
-        let chatTitle = 'Без названия';
+        // Получаем имя пользователя (основное название чата)
+        let userName = 'Пользователь';
+        if (chat.users && chat.users.length > 0 && chat.users[0].name) {
+            userName = chat.users[0].name;
+        } else if (chat.user_id) {
+            userName = `ID ${chat.user_id}`;
+        }
         
-        // Проверяем context.value.title (основной источник названия)
+        // Получаем название объявления (подзаголовок)
+        let itemTitle = '';
         if (chat.context && chat.context.value && chat.context.value.title) {
-            chatTitle = chat.context.value.title;
-        } 
-        // Запасной вариант - имя пользователя из users
-        else if (chat.users && chat.users.length > 0) {
-            // Ищем другого пользователя (не текущего)
-            const otherUser = chat.users.find(u => u.id !== chat.user_id && u.name);
-            if (otherUser && otherUser.name) {
-                chatTitle = otherUser.name;
-            }
-        }
-        // Если title передан напрямую
-        else if (chat.title && typeof chat.title === 'string') {
-            chatTitle = chat.title;
-        }
-        
-        // Проверяем что chatTitle - это строка, а не объект
-        if (typeof chatTitle !== 'string') {
-            console.warn('Chat title is not a string:', chatTitle, 'for chat:', chat);
-            chatTitle = 'Чат';
+            itemTitle = chat.context.value.title;
         }
         
         return `
             <div class="chat-item ${chat.id === currentChatId ? 'active' : ''}" 
                  onclick="selectChat('${chat.id}')">
                 <div class="chat-item-header">
-                    <div class="chat-item-name">${escapeHtml(chatTitle)}</div>
+                    <div class="chat-item-name">${escapeHtml(userName)}</div>
                     <div class="chat-item-time">${time}</div>
                 </div>
+                ${itemTitle ? `<div class="chat-item-subtitle">${escapeHtml(itemTitle)}</div>` : ''}
                 <div class="chat-item-preview">${escapeHtml(preview)}</div>
             </div>
         `;
@@ -149,34 +138,30 @@ async function loadMessages(chatId) {
         
         messages = data.messages || [];
         
-        // Получаем информацию о чате и правильное название
+        // Получаем информацию о чате
         const chat = chats.find(c => c.id === chatId);
-        let chatTitle = 'Чат';
+        let userName = 'Пользователь';
+        let itemTitle = '';
         
         if (chat) {
-            // Проверяем context.value.title (основной источник названия)
-            if (chat.context && chat.context.value && chat.context.value.title) {
-                chatTitle = chat.context.value.title;
-            } 
-            // Запасной вариант - имя пользователя
-            else if (chat.users && chat.users.length > 0) {
-                const otherUser = chat.users.find(u => u.id !== chat.user_id && u.name);
-                if (otherUser && otherUser.name) {
-                    chatTitle = otherUser.name;
-                }
-            }
-            // Если title передан напрямую
-            else if (chat.title && typeof chat.title === 'string') {
-                chatTitle = chat.title;
+            // Получаем имя пользователя (основное название)
+            if (chat.users && chat.users.length > 0 && chat.users[0].name) {
+                userName = chat.users[0].name;
+            } else if (chat.user_id) {
+                userName = `ID ${chat.user_id}`;
             }
             
-            // Проверяем что это строка
-            if (typeof chatTitle !== 'string') {
-                chatTitle = 'Чат';
+            // Получаем название объявления (подзаголовок)
+            if (chat.context && chat.context.value && chat.context.value.title) {
+                itemTitle = chat.context.value.title;
             }
         }
         
-        messagesHeader.innerHTML = `<h2>${escapeHtml(chatTitle)}</h2>`;
+        // Формируем заголовок с именем пользователя и названием объявления
+        messagesHeader.innerHTML = `
+            <h2>${escapeHtml(userName)}</h2>
+            ${itemTitle ? `<div class="chat-subtitle">${escapeHtml(itemTitle)}</div>` : ''}
+        `;
         
         renderMessages();
     } catch (error) {
