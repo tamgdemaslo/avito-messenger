@@ -187,6 +187,9 @@ async function loadMessages(chatId) {
         
         messages = data.messages || [];
         
+        // Сортируем сообщения по времени (старые сверху, новые внизу)
+        messages.sort((a, b) => (a.created || 0) - (b.created || 0));
+        
         // Сохраняем информацию о чате и текущем пользователе
         window.currentChatInfo = data.chat_info;
         window.currentUserId = data.current_user_id;
