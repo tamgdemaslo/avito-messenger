@@ -404,9 +404,9 @@ body {
     opacity: 1;
 }
 
-/* Reply Form */
+/* Reply Form - Avito Style */
 .reply-form {
-    padding: 20px 24px;
+    padding: 16px 24px;
     border-top: 1px solid var(--border-color);
     background: var(--surface);
     position: absolute;
@@ -415,35 +415,52 @@ body {
     right: 0;
     z-index: 10;
     box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.reply-actions {
     display: flex;
-    gap: 8px;
-    margin-bottom: 12px;
-}
-
-.reply-input-wrapper {
-    display: flex;
+    align-items: center;
     gap: 12px;
-    align-items: flex-end;
 }
 
-.reply-input-wrapper textarea {
+.input-icon-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background 0.2s;
+    flex-shrink: 0;
+}
+
+.input-icon-btn:hover {
+    background: var(--background);
+}
+
+.input-send-btn {
+    display: none;
+}
+
+.message-input-field {
     flex: 1;
-    padding: 12px;
-    border: 1px solid var(--border-color);
+    padding: 12px 16px;
+    border: 2px solid #d9e1e8;
     border-radius: 8px;
     font-size: 15px;
     font-family: inherit;
-    resize: none;
-    min-height: 60px;
+    background: #f8f9fa;
+    transition: all 0.2s;
 }
 
-.reply-input-wrapper textarea:focus {
+.message-input-field:focus {
     outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(0, 160, 70, 0.1);
+    border-color: #4a9eff;
+    background: white;
+}
+
+.message-input-field::placeholder {
+    color: #9ca3af;
 }
 
 /* Loading */
