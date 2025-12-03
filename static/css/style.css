@@ -383,6 +383,39 @@ body {
     min-height: 0;
 }
 
+/* Скелетон загрузки сообщений */
+.messages-skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 24px;
+}
+
+.skeleton-message {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s infinite;
+    border-radius: 12px;
+    height: 60px;
+    width: 70%;
+}
+
+.skeleton-message.own {
+    align-self: flex-end;
+    width: 60%;
+    background: linear-gradient(90deg, #e8f5e9 25%, #d0f0d9 50%, #e8f5e9 75%);
+    background-size: 200% 100%;
+}
+
+@keyframes skeleton-loading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
 .empty-state {
     flex: 1;
     display: flex;

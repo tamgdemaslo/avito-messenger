@@ -4,6 +4,7 @@ let currentChatId = null;
 let chats = [];
 let messages = [];
 let messagesCache = {}; // Кэш сообщений для быстрого переключения
+let currentLoadController = null; // Контроллер для отмены предыдущих запросов
 
 // DOM Elements
 const chatsList = document.getElementById('chatsList');
@@ -407,12 +408,21 @@ function renderChats() {
 }
 
 async function selectChat(chatId) {
+    // Отменяем предыдущую загрузку если она еще идет
+    if (currentLoadController) {
+        currentLoadController.abort();
+    }
+    
     currentChatId = chatId;
     renderChats();
-    await loadMessages(chatId);
+    
+    // Показываем форму сразу
     replyForm.style.display = 'block';
     
-    // Помечаем чат прочитанным
+    // Загружаем сообщения (не ждем завершения)
+    loadMessages(chatId);
+    
+    // Помечаем чат прочитанным в фоне
     markChatAsRead(chatId);
 }
 
@@ -439,8 +449,15 @@ async function markChatAsRead(chatId) {
 }
 
 async function loadMessages(chatId, silent = false) {
+    // Создаем новый контроллер для отмены запроса
+    if (!silent) {
+        currentLoadController = new AbortController();
+    }
+    
     // Проверяем кэш - если есть, показываем сразу (мгновенно)
-    if (messagesCache[chatId] && !silent) {
+    const hasCache = messagesCache[chatId];
+    
+    if (hasCache && !silent) {
         messages = messagesCache[chatId].messages;
         window.currentChatInfo = messagesCache[chatId].chatInfo;
         window.currentUserId = messagesCache[chatId].userId;
@@ -454,11 +471,16 @@ async function loadMessages(chatId, silent = false) {
             top: messagesList.scrollHeight,
             behavior: 'auto' // Без анимации для скорости
         });
+    } else if (!silent && !hasCache) {
+        // Показываем скелетон только если нет кэша
+        showMessagesSkeleton();
     }
     
     // Загружаем свежие данные в фоне
     try {
-        const response = await fetch(`/api/chats/${chatId}/messages`);
+        const response = await fetch(`/api/chats/${chatId}/messages`, {
+            signal: !silent ? currentLoadController.signal : undefined
+        });
         const data = await response.json();
         
         if (data.error) {
@@ -502,8 +524,33 @@ async function loadMessages(chatId, silent = false) {
         renderChatHeader(data.chat_info);
         renderMessages();
     } catch (error) {
+        // Игнорируем ошибки отмены (это нормально при быстром переключении)
+        if (error.name === 'AbortError') {
+            console.log('Загрузка сообщений отменена (переключение на другой чат)');
+            return;
+        }
         if (!silent) showError('Ошибка загрузки сообщений: ' + error.message);
     }
+}
+
+// Показать скелетон загрузки сообщений
+function showMessagesSkeleton() {
+    // Показываем заголовок из списка чатов
+    const chat = chats.find(c => c.id === currentChatId);
+    if (chat) {
+        renderChatHeader(chat);
+    }
+    
+    // Показываем скелетон сообщений
+    messagesList.innerHTML = `
+        <div class="messages-skeleton">
+            <div class="skeleton-message"></div>
+            <div class="skeleton-message own"></div>
+            <div class="skeleton-message"></div>
+            <div class="skeleton-message own"></div>
+            <div class="skeleton-message"></div>
+        </div>
+    `;
 }
 
 // Отдельная функция для рендеринга заголовка чата
