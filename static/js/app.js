@@ -115,41 +115,44 @@ function renderChats() {
             preview = lastMessage.text;
         }
         
-        // Получаем имя пользователя (основное название чата)
-        // Ищем пользователя, который НЕ является текущим (собеседника)
+        // Получаем имя пользователя и аватарку
         let userName = 'Пользователь';
         let userAvatar = '';
-        let otherUser = null;
         
-        if (chat.users && chat.users.length > 0) {
-            // Ищем собеседника (не текущего пользователя)
-            otherUser = chat.users.find(u => u.id !== currentUserId);
+        // === TELEGRAM ===
+        if (chat.source === 'telegram') {
+            userName = chat.name || 'Telegram Chat';
+            userAvatar = chat.avatar || '';
+        }
+        // === AVITO ===
+        else {
+            let otherUser = null;
             
-            // Если не нашли, берем первого пользователя
-            if (!otherUser) {
-                otherUser = chat.users[0];
-            }
-            
-            if (otherUser) {
-                userName = otherUser.name || `ID ${otherUser.id}`;
-                // Извлекаем аватарку из правильной структуры
-                // Аватарки находятся в public_user_profile.avatar
-                if (otherUser.public_user_profile && otherUser.public_user_profile.avatar) {
-                    const avatar = otherUser.public_user_profile.avatar;
-                    if (avatar.images && avatar.images['48x48']) {
-                        userAvatar = avatar.images['48x48'];
-                    } else if (avatar.default) {
-                        userAvatar = avatar.default;
+            if (chat.users && chat.users.length > 0) {
+                // Ищем собеседника (не текущего пользователя)
+                otherUser = chat.users.find(u => u.id !== currentUserId);
+                
+                // Если не нашли, берем первого пользователя
+                if (!otherUser) {
+                    otherUser = chat.users[0];
+                }
+                
+                if (otherUser) {
+                    userName = otherUser.name || `ID ${otherUser.id}`;
+                    // Извлекаем аватарку из правильной структуры
+                    // Аватарки находятся в public_user_profile.avatar
+                    if (otherUser.public_user_profile && otherUser.public_user_profile.avatar) {
+                        const avatar = otherUser.public_user_profile.avatar;
+                        if (avatar.images && avatar.images['48x48']) {
+                            userAvatar = avatar.images['48x48'];
+                        } else if (avatar.default) {
+                            userAvatar = avatar.default;
+                        }
                     }
                 }
-                // Отладочное логирование
-                if (chat.id === chats[0].id) {
-                    console.log('First chat - other user:', otherUser);
-                    console.log('First chat - avatar URL:', userAvatar);
-                }
+            } else if (chat.user_id) {
+                userName = `ID ${chat.user_id}`;
             }
-        } else if (chat.user_id) {
-            userName = `ID ${chat.user_id}`;
         }
         
         // Получаем название объявления (подзаголовок)
@@ -158,13 +161,22 @@ function renderChats() {
             itemTitle = chat.context.value.title;
         }
         
+        // Определяем источник чата
+        const source = chat.source || 'avito';
+        const sourceBadge = source === 'telegram' 
+            ? '<span class="source-badge source-badge-telegram">Telegram</span>'
+            : '<span class="source-badge source-badge-avito">Avito</span>';
+        
         return `
             <div class="chat-item ${chat.id === currentChatId ? 'active' : ''}" 
                  onclick="selectChat('${chat.id}')">
                 ${userAvatar ? `<img src="${escapeHtml(userAvatar)}" alt="${escapeHtml(userName)}" class="chat-item-avatar" onerror="this.style.display='none'">` : '<div class="chat-item-avatar-placeholder"></div>'}
                 <div class="chat-item-content">
                     <div class="chat-item-header">
-                        <div class="chat-item-name">${escapeHtml(userName)}</div>
+                        <div class="chat-item-name-wrapper">
+                            <div class="chat-item-name">${escapeHtml(userName)}</div>
+                            ${sourceBadge}
+                        </div>
                         <div class="chat-item-time">${time}</div>
                     </div>
                     ${itemTitle ? `<div class="chat-item-subtitle">${escapeHtml(itemTitle)}</div>` : ''}
@@ -222,39 +234,45 @@ async function loadMessages(chatId) {
         let itemTitle = '';
         
         if (chat) {
-            // Получаем имя пользователя (основное название)
-            // Ищем пользователя, который НЕ является текущим (собеседника)
-            let otherUser = null;
-            
-            if (chat.users && chat.users.length > 0) {
-                // Ищем собеседника (не текущего пользователя)
-                otherUser = chat.users.find(u => u.id !== currentUserId && u.id !== window.currentUserId);
+            // === TELEGRAM ===
+            if (chat.source === 'telegram') {
+                userName = chat.name || 'Telegram Chat';
+                userAvatar = chat.avatar || '';
+                itemTitle = chat.type === 'channel' ? 'Канал' : (chat.type === 'group' ? 'Группа' : '');
+            }
+            // === AVITO ===
+            else {
+                let otherUser = null;
                 
-                // Если не нашли, берем первого пользователя
-                if (!otherUser) {
-                    otherUser = chat.users[0];
-                }
-                
-            if (otherUser) {
-                userName = otherUser.name || `ID ${otherUser.id}`;
-                // Извлекаем аватарку из правильной структуры
-                // Аватарки находятся в public_user_profile.avatar
-                if (otherUser.public_user_profile && otherUser.public_user_profile.avatar) {
-                    const avatar = otherUser.public_user_profile.avatar;
-                    if (avatar.images && avatar.images['48x48']) {
-                        userAvatar = avatar.images['48x48'];
-                    } else if (avatar.default) {
-                        userAvatar = avatar.default;
+                if (chat.users && chat.users.length > 0) {
+                    // Ищем собеседника (не текущего пользователя)
+                    otherUser = chat.users.find(u => u.id !== currentUserId && u.id !== window.currentUserId);
+                    
+                    // Если не нашли, берем первого пользователя
+                    if (!otherUser) {
+                        otherUser = chat.users[0];
                     }
+                    
+                    if (otherUser) {
+                        userName = otherUser.name || `ID ${otherUser.id}`;
+                        // Извлекаем аватарку из правильной структуры
+                        if (otherUser.public_user_profile && otherUser.public_user_profile.avatar) {
+                            const avatar = otherUser.public_user_profile.avatar;
+                            if (avatar.images && avatar.images['48x48']) {
+                                userAvatar = avatar.images['48x48'];
+                            } else if (avatar.default) {
+                                userAvatar = avatar.default;
+                            }
+                        }
+                    }
+                } else if (chat.user_id) {
+                    userName = `ID ${chat.user_id}`;
                 }
-            }
-            } else if (chat.user_id) {
-                userName = `ID ${chat.user_id}`;
-            }
-            
-            // Получаем название объявления (подзаголовок)
-            if (chat.context && chat.context.value && chat.context.value.title) {
-                itemTitle = chat.context.value.title;
+                
+                // Получаем название объявления (подзаголовок)
+                if (chat.context && chat.context.value && chat.context.value.title) {
+                    itemTitle = chat.context.value.title;
+                }
             }
         }
         

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram Авторизация</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="login-card">
+            <div class="logo">
+                <h1>Telegram Авторизация</h1>
+                <p>Подключите Telegram к CRM</p>
+            </div>
+            
+            <div class="login-content">
+                <div id="authStep1" style="display: block;">
+                    <p class="description">
+                        Код будет отправлен на ваш номер: +7 999 255 6031
+                    </p>
+                    <button class="btn btn-primary" onclick="requestCode()">
+                        Отправить код
+                    </button>
+                </div>
+                
+                <div id="authStep2" style="display: none;">
+                    <p class="description">
+                        Введите код из Telegram
+                    </p>
+                    <input type="text" id="codeInput" placeholder="12345" style="width: 100%; padding: 12px; margin-bottom: 16px; border: 1px solid #dee2e6; border-radius: 8px; font-size: 16px;">
+                    <button class="btn btn-primary" onclick="submitCode()">
+                        Подтвердить
+                    </button>
+                </div>
+                
+                <div id="authStep3" style="display: none;">
+                    <p class="description">
+                        Введите пароль двухфакторной аутентификации (если установлен)
+                    </p>
+                    <input type="password" id="passwordInput" placeholder="Пароль" style="width: 100%; padding: 12px; margin-bottom: 16px; border: 1px solid #dee2e6; border-radius: 8px; font-size: 16px;">
+                    <button class="btn btn-primary" onclick="submitPassword()">
+                        Подтвердить
+                    </button>
+                </div>
+                
+                <div id="authSuccess" style="display: none;">
+                    <p class="description" style="color: #00a046;">
+                        ✅ Авторизация успешна!
+                    </p>
+                    <a href="/messages" class="btn btn-primary">
+                        Перейти к сообщениям
+                    </a>
+                </div>
+                
+                <div id="authError" style="display: none; color: red; margin-top: 16px;"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        async function requestCode() {
+            try {
+                const response = await fetch('/api/telegram/auth', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({phone: '+79992556031'})
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'code_sent') {
+                    document.getElementById('authStep1').style.display = 'none';
+                    document.getElementById('authStep2').style.display = 'block';
+                } else {
+                    showError(data.message || 'Ошибка отправки кода');
+                }
+            } catch (e) {
+                showError('Ошибка: ' + e.message);
+            }
+        }
+        
+        async function submitCode() {
+            const code = document.getElementById('codeInput').value.trim();
+            if (!code) {
+                showError('Введите код');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/telegram/auth', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        phone: '+79992556031',
+                        code: code
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'authorized' || data.status === 'already_authorized') {
+                    document.getElementById('authStep2').style.display = 'none';
+                    document.getElementById('authSuccess').style.display = 'block';
+                } else if (data.message && data.message.includes('password')) {
+                    document.getElementById('authStep2').style.display = 'none';
+                    document.getElementById('authStep3').style.display = 'block';
+                } else {
+                    showError(data.message || 'Ошибка авторизации');
+                }
+            } catch (e) {
+                showError('Ошибка: ' + e.message);
+            }
+        }
+        
+        async function submitPassword() {
+            const password = document.getElementById('passwordInput').value.trim();
+            const code = document.getElementById('codeInput').value.trim();
+            
+            if (!password) {
+                showError('Введите пароль');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/telegram/auth', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        phone: '+79992556031',
+                        code: code,
+                        password: password
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'authorized' || data.status === 'already_authorized') {
+                    document.getElementById('authStep3').style.display = 'none';
+                    document.getElementById('authSuccess').style.display = 'block';
+                } else {
+                    showError(data.message || 'Ошибка авторизации');
+                }
+            } catch (e) {
+                showError('Ошибка: ' + e.message);
+            }
+        }
+        
+        function showError(message) {
+            const errorDiv = document.getElementById('authError');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
+

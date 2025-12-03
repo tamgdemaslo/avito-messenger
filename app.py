@@ -11,6 +11,7 @@ import requests
 import os
 from datetime import datetime, timedelta
 import json
+import telegram_client
 
 # Получаем абсолютный путь к директории проекта
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -140,46 +141,51 @@ def get_profile():
 
 @app.route('/api/chats', methods=['GET'])
 def get_chats():
-    """Получить список чатов"""
-    # Сначала получаем user_id
+    """Получить объединенный список чатов из Avito и Telegram"""
+    all_chats = []
+    current_user_id = None
+    
+    # === AVITO ЧАТЫ ===
     profile, error = make_avito_request("GET", "/core/v1/accounts/self")
-    if error:
-        print(f"Error getting profile: {error}")
-        return jsonify({"error": error}), 500
+    if not error and profile:
+        user_id = profile.get('id')
+        current_user_id = user_id
+        
+        if user_id:
+            print(f"Got Avito user_id: {user_id}")
+            chats_data, chats_error = make_avito_request("GET", f"/messenger/v2/accounts/{user_id}/chats")
+            
+            if not chats_error and chats_data and isinstance(chats_data, dict) and 'chats' in chats_data:
+                avito_chats = chats_data['chats']
+                # Помечаем как Avito
+                for chat in avito_chats:
+                    chat['source'] = 'avito'
+                    chat['source_icon'] = 'avito'
+                all_chats.extend(avito_chats)
+                print(f"Loaded {len(avito_chats)} Avito chats")
     
-    user_id = profile.get('id')
-    if not user_id:
-        print(f"No user ID in profile: {profile}")
-        return jsonify({"error": "Could not get user ID"}), 500
+    # === TELEGRAM ЧАТЫ ===
+    try:
+        telegram_chats = telegram_client.get_telegram_chats(limit=100)
+        if telegram_chats:
+            print(f"Loaded {len(telegram_chats)} Telegram chats")
+            all_chats.extend(telegram_chats)
+    except Exception as e:
+        print(f"Telegram chats error (skipping): {e}")
     
-    print(f"Got user_id: {user_id}")
+    # Сортируем по времени обновления (новые сверху)
+    all_chats.sort(key=lambda x: x.get('updated', 0), reverse=True)
     
-    # Получаем чаты
-    chats, error = make_avito_request("GET", f"/messenger/v2/accounts/{user_id}/chats")
-    if error:
-        print(f"Error getting chats: {error}")
-        return jsonify({"error": error}), 500
+    print(f"Total chats: {len(all_chats)}")
     
-    # Логируем структуру ответа для отладки
-    print(f"Chats response type: {type(chats)}")
-    if isinstance(chats, dict):
-        print(f"Chats keys: {chats.keys()}")
-        if 'chats' in chats:
-            print(f"Number of chats: {len(chats['chats'])}")
-            if chats['chats']:
-                print(f"First chat keys: {chats['chats'][0].keys()}")
-                first_chat = chats['chats'][0]
-                print(f"First chat - title: {first_chat.get('title')}")
-                print(f"First chat - context: {first_chat.get('context')}")
-                print(f"First chat - last_message: {first_chat.get('last_message')}")
-                print(f"First chat sample (full): {json.dumps(first_chat, ensure_ascii=False, indent=2)}")
-    
-    # Добавляем current_user_id к ответу
-    result = chats if chats else {"chats": []}
-    if isinstance(result, dict):
-        result['current_user_id'] = user_id
-    
-    return jsonify(result)
+    return jsonify({
+        "chats": all_chats,
+        "current_user_id": current_user_id,
+        "sources": {
+            "avito": len([c for c in all_chats if c.get('source') == 'avito']),
+            "telegram": len([c for c in all_chats if c.get('source') == 'telegram'])
+        }
+    })
 
 
 @app.route('/api/messages', methods=['GET'])
@@ -230,65 +236,93 @@ def get_messages():
 
 @app.route('/api/chats/<chat_id>/messages', methods=['GET'])
 def get_chat_messages(chat_id):
-    """Получить сообщения конкретного чата"""
+    """Получить сообщения конкретного чата (Avito или Telegram)"""
     print(f"Fetching messages for chat_id: {chat_id}")
     
-    # Получаем user_id из профиля
-    profile, error = make_avito_request("GET", "/core/v1/accounts/self")
-    if error:
-        print(f"Error getting profile: {error}")
-        return jsonify({"error": error}), 500
+    # Определяем источник по префиксу ID
+    if chat_id.startswith('tg_'):
+        # === TELEGRAM ===
+        try:
+            messages_list = telegram_client.get_telegram_messages(chat_id, limit=100)
+            
+            # Получаем информацию о чате
+            telegram_chats = telegram_client.get_telegram_chats(limit=100)
+            chat_info = next((c for c in telegram_chats if c['id'] == chat_id), None)
+            
+            # Преобразуем формат сообщений для единого интерфейса
+            for msg in messages_list:
+                if 'content' not in msg:
+                    msg['content'] = {'text': msg.get('text', '')}
+                msg['source'] = 'telegram'
+            
+            return jsonify({
+                "messages": messages_list,
+                "chat_id": chat_id,
+                "chat_info": chat_info,
+                "current_user_id": None,
+                "source": "telegram"
+            })
+        except Exception as e:
+            print(f"Telegram messages error: {e}")
+            return jsonify({"error": f"Telegram error: {str(e)}"}), 500
     
-    user_id = profile.get('id')
-    if not user_id:
-        print(f"No user ID in profile: {profile}")
-        return jsonify({"error": "Could not get user ID"}), 500
-    
-    # Получаем информацию о чате (для пользователей)
-    chats_data, chats_error = make_avito_request("GET", f"/messenger/v2/accounts/{user_id}/chats")
-    chat_info = None
-    if not chats_error and chats_data and 'chats' in chats_data:
-        for chat in chats_data['chats']:
-            if chat.get('id') == chat_id:
-                chat_info = chat
-                break
-    
-    # Получаем сообщения для чата
-    messages_data, error = make_avito_request(
-        "GET",
-        f"/messenger/v3/accounts/{user_id}/chats/{chat_id}/messages/"
-    )
-    
-    if error:
-        print(f"Error getting messages: {error}")
-        return jsonify({"error": error}), 500
-    
-    print(f"Messages response type: {type(messages_data)}")
-    
-    # Обрабатываем ответ - API может вернуть либо список, либо объект с полем messages
-    if isinstance(messages_data, dict):
-        print(f"Messages dict keys: {messages_data.keys()}")
-        messages_list = messages_data.get('messages', [])
-    elif isinstance(messages_data, list):
-        messages_list = messages_data
     else:
-        messages_list = []
-    
-    print(f"Number of messages: {len(messages_list)}")
-    if messages_list:
-        print(f"First message sample: {json.dumps(messages_list[0], ensure_ascii=False, indent=2)}")
-    
-    return jsonify({
-        "messages": messages_list,
-        "chat_id": chat_id,
-        "chat_info": chat_info,
-        "current_user_id": user_id
-    })
+        # === AVITO ===
+        profile, error = make_avito_request("GET", "/core/v1/accounts/self")
+        if error:
+            print(f"Error getting profile: {error}")
+            return jsonify({"error": error}), 500
+        
+        user_id = profile.get('id')
+        if not user_id:
+            print(f"No user ID in profile: {profile}")
+            return jsonify({"error": "Could not get user ID"}), 500
+        
+        # Получаем информацию о чате (для пользователей)
+        chats_data, chats_error = make_avito_request("GET", f"/messenger/v2/accounts/{user_id}/chats")
+        chat_info = None
+        if not chats_error and chats_data and 'chats' in chats_data:
+            for chat in chats_data['chats']:
+                if chat.get('id') == chat_id:
+                    chat_info = chat
+                    break
+        
+        # Получаем сообщения для чата
+        messages_data, error = make_avito_request(
+            "GET",
+            f"/messenger/v3/accounts/{user_id}/chats/{chat_id}/messages/"
+        )
+        
+        if error:
+            print(f"Error getting messages: {error}")
+            return jsonify({"error": error}), 500
+        
+        # Обрабатываем ответ
+        if isinstance(messages_data, dict):
+            messages_list = messages_data.get('messages', [])
+        elif isinstance(messages_data, list):
+            messages_list = messages_data
+        else:
+            messages_list = []
+        
+        # Помечаем как Avito
+        for msg in messages_list:
+            msg['source'] = 'avito'
+        
+        print(f"Number of Avito messages: {len(messages_list)}")
+        
+        return jsonify({
+            "messages": messages_list,
+            "chat_id": chat_id,
+            "chat_info": chat_info,
+            "current_user_id": user_id,
+            "source": "avito"
+        })
 
 
 @app.route('/api/messages/send', methods=['POST'])
 def send_message():
-    """Отправить сообщение"""
+    """Отправить сообщение (Avito или Telegram)"""
     data = request.json
     chat_id = data.get('chat_id')
     message_text = data.get('message')
@@ -296,32 +330,46 @@ def send_message():
     if not chat_id or not message_text:
         return jsonify({"error": "chat_id and message are required"}), 400
     
-    profile, error = make_avito_request("GET", "/core/v1/accounts/self")
-    if error:
-        return jsonify({"error": error}), 500
+    # Определяем источник
+    if chat_id.startswith('tg_'):
+        # === TELEGRAM ===
+        try:
+            result = telegram_client.send_telegram_message(chat_id, message_text)
+            if result and result.get('success'):
+                return jsonify({"success": True, "data": result})
+            else:
+                return jsonify({"error": result.get('error', 'Unknown error')}), 500
+        except Exception as e:
+            return jsonify({"error": f"Telegram error: {str(e)}"}), 500
     
-    user_id = profile.get('id')
-    if not user_id:
-        return jsonify({"error": "Could not get user ID"}), 500
-    
-    # Отправляем сообщение
-    message_data = {
-        "message": {
-            "text": message_text
-        },
-        "type": "text"
-    }
-    
-    result, error = make_avito_request(
-        "POST",
-        f"/messenger/v1/accounts/{user_id}/chats/{chat_id}/messages",
-        message_data
-    )
-    
-    if error:
-        return jsonify({"error": error}), 500
-    
-    return jsonify({"success": True, "data": result})
+    else:
+        # === AVITO ===
+        profile, error = make_avito_request("GET", "/core/v1/accounts/self")
+        if error:
+            return jsonify({"error": error}), 500
+        
+        user_id = profile.get('id')
+        if not user_id:
+            return jsonify({"error": "Could not get user ID"}), 500
+        
+        # Отправляем сообщение
+        message_data = {
+            "message": {
+                "text": message_text
+            },
+            "type": "text"
+        }
+        
+        result, error = make_avito_request(
+            "POST",
+            f"/messenger/v1/accounts/{user_id}/chats/{chat_id}/messages",
+            message_data
+        )
+        
+        if error:
+            return jsonify({"error": error}), 500
+        
+        return jsonify({"success": True, "data": result})
 
 
 @app.route('/api/messages/delete', methods=['POST'])
@@ -589,6 +637,44 @@ def get_chat_info(chat_id):
         return jsonify({"error": error}), 500
     
     return jsonify({"success": True, "data": result})
+
+
+@app.route('/api/telegram/auth', methods=['POST'])
+def telegram_auth():
+    """Авторизация в Telegram"""
+    data = request.json
+    phone = data.get('phone', '+79992556031')
+    code = data.get('code')
+    password = data.get('password')
+    
+    try:
+        result = telegram_client.authorize_telegram(phone, code, password)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/telegram/status', methods=['GET'])
+def telegram_status():
+    """Проверить статус авторизации Telegram"""
+    try:
+        # Инициализируем клиент
+        telegram_client.run_async(telegram_client.init_telegram_client())
+        if telegram_client.telegram_client and telegram_client.telegram_client.is_connected():
+            is_auth = telegram_client.run_async(telegram_client.telegram_client.is_user_authorized())
+            return jsonify({
+                "connected": True,
+                "authorized": is_auth
+            })
+        return jsonify({"connected": False, "authorized": False})
+    except Exception as e:
+        return jsonify({"connected": False, "authorized": False, "error": str(e)})
+
+
+@app.route('/telegram/auth')
+def telegram_auth_page():
+    """Страница авторизации Telegram"""
+    return render_template('telegram_auth.html')
 
 
 @app.route('/test')

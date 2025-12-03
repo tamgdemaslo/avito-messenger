@@ -221,10 +221,39 @@ body {
     margin-bottom: 4px;
 }
 
+.chat-item-name-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+}
+
 .chat-item-name {
     font-weight: 600;
     color: var(--text-primary);
     font-size: 15px;
+}
+
+.source-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.source-badge-avito {
+    background: linear-gradient(135deg, #00a046 0%, #00c853 100%);
+    color: white;
+    box-shadow: 0 2px 4px rgba(0, 160, 70, 0.3);
+}
+
+.source-badge-telegram {
+    background: linear-gradient(135deg, #0088cc 0%, #229ed9 100%);
+    color: white;
+    box-shadow: 0 2px 4px rgba(0, 136, 204, 0.3);
 }
 
 .chat-item-time {
