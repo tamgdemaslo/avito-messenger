@@ -21,28 +21,51 @@ let currentUserId = null;
 // Автообновление и уведомления
 let autoRefreshInterval = null;
 let lastMessageCount = {};
-let notificationSound = null;
+let receiveSound = null;
+let sendSound = null;
 
-// Создаем звук уведомления
+// Создаем звуки уведомлений
 function initNotificationSound() {
-    // Используем Web Audio API для создания простого звука
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    // Звук получения сообщения
+    receiveSound = new Audio('/static/sounds/popup-sound-modal.mp3');
+    receiveSound.volume = 0.5;
     
-    notificationSound = () => {
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        
-        oscillator.frequency.value = 800;
-        oscillator.type = 'sine';
-        
-        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-        
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.5);
+    // Звук отправки сообщения
+    sendSound = new Audio('/static/sounds/beautiful-sms-notification-sound.mp3');
+    sendSound.volume = 0.5;
+    
+    // Если файлы не загрузились, используем синтетический звук
+    receiveSound.addEventListener('error', () => {
+        console.log('Звуковой файл получения не найден, используем синтетический звук');
+        receiveSound = createSyntheticSound(600, 0.3);
+    });
+    
+    sendSound.addEventListener('error', () => {
+        console.log('Звуковой файл отправки не найден, используем синтетический звук');
+        sendSound = createSyntheticSound(800, 0.2);
+    });
+}
+
+// Создание синтетического звука (запасной вариант)
+function createSyntheticSound(frequency, volume) {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    return {
+        play: () => {
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = frequency;
+            oscillator.type = 'sine';
+            
+            gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.3);
+        }
     };
 }
 
@@ -207,9 +230,9 @@ async function loadChats(silent = false) {
         });
         
         // Воспроизводим звук если есть новые сообщения
-        if (hasNewMessages && notificationSound) {
+        if (hasNewMessages && receiveSound) {
             try {
-                notificationSound();
+                receiveSound.play();
             } catch (e) {
                 console.log('Не удалось воспроизвести звук:', e);
             }
@@ -632,7 +655,19 @@ async function sendMessage() {
         return;
     }
     
-    showLoading();
+    // Очищаем поле ввода сразу (мгновенная отправка)
+    messageInput.value = '';
+    
+    // Воспроизводим звук отправки
+    if (sendSound) {
+        try {
+            sendSound.play();
+        } catch (e) {
+            console.log('Не удалось воспроизвести звук отправки:', e);
+        }
+    }
+    
+    // Отправляем сообщение в фоне без блокировки UI
     try {
         const response = await fetch('/api/messages/send', {
             method: 'POST',
@@ -649,21 +684,18 @@ async function sendMessage() {
         
         if (data.error) {
             showError(data.error);
+            // Возвращаем текст обратно в поле если ошибка
+            messageInput.value = text;
             return;
         }
         
-        // Очищаем поле ввода
-        messageInput.value = '';
-        
-        // Обновляем сообщения
-        await loadMessages(currentChatId);
-        
-        // Обновляем список чатов
-        await loadChats();
+        // Тихо обновляем сообщения и чаты в фоне
+        loadMessages(currentChatId, true);
+        loadChats(true);
     } catch (error) {
         showError('Ошибка отправки сообщения: ' + error.message);
-    } finally {
-        hideLoading();
+        // Возвращаем текст обратно в поле если ошибка
+        messageInput.value = text;
     }
 }
 
