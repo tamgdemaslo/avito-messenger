@@ -403,24 +403,39 @@ def delete_message():
 
 @app.route('/api/chats/<chat_id>/read', methods=['POST'])
 def mark_chat_read(chat_id):
-    """Пометить чат как прочитанный"""
-    profile, error = make_avito_request("GET", "/core/v1/accounts/self")
-    if error:
-        return jsonify({"error": error}), 500
+    """Пометить чат как прочитанный (Avito или Telegram)"""
     
-    user_id = profile.get('id')
-    if not user_id:
-        return jsonify({"error": "Could not get user ID"}), 500
+    # Определяем источник по префиксу ID
+    if chat_id.startswith('tg_'):
+        # === TELEGRAM ===
+        try:
+            result = telegram_client.mark_telegram_read(chat_id)
+            if result and result.get('success'):
+                return jsonify({"success": True})
+            else:
+                return jsonify({"error": result.get('error', 'Unknown error')}), 500
+        except Exception as e:
+            return jsonify({"error": f"Telegram error: {str(e)}"}), 500
     
-    result, error = make_avito_request(
-        "POST",
-        f"/messenger/v1/accounts/{user_id}/chats/{chat_id}/read"
-    )
-    
-    if error:
-        return jsonify({"error": error}), 500
-    
-    return jsonify({"success": True, "data": result})
+    else:
+        # === AVITO ===
+        profile, error = make_avito_request("GET", "/core/v1/accounts/self")
+        if error:
+            return jsonify({"error": error}), 500
+        
+        user_id = profile.get('id')
+        if not user_id:
+            return jsonify({"error": "Could not get user ID"}), 500
+        
+        result, error = make_avito_request(
+            "POST",
+            f"/messenger/v1/accounts/{user_id}/chats/{chat_id}/read"
+        )
+        
+        if error:
+            return jsonify({"error": error}), 500
+        
+        return jsonify({"success": True, "data": result})
 
 
 @app.route('/api/images/upload', methods=['POST'])

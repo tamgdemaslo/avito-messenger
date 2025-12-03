@@ -390,9 +390,21 @@ async function selectChat(chatId) {
 
 async function markChatAsRead(chatId) {
     try {
-        await fetch(`/api/chats/${chatId}/read`, {
+        const response = await fetch(`/api/chats/${chatId}/read`, {
             method: 'POST'
         });
+        
+        if (response.ok) {
+            // Обновляем локальный список чатов, чтобы сразу убрать бейдж
+            const chat = chats.find(c => c.id === chatId);
+            if (chat) {
+                chat.unread_count = 0;
+                if (chat.last_message) {
+                    chat.last_message.isRead = true;
+                }
+                renderChats(); // Перерисовываем список чатов
+            }
+        }
     } catch (error) {
         console.error('Error marking chat as read:', error);
     }

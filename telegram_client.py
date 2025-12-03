@@ -244,6 +244,24 @@ async def send_telegram_message_async(chat_id, text):
         return {'success': False, 'error': str(e)}
 
 
+async def mark_telegram_read_async(chat_id):
+    """Пометить сообщения в Telegram чате как прочитанные"""
+    client = await init_telegram_client()
+    if not client:
+        return {'success': False, 'error': 'Client not initialized'}
+    
+    original_id = int(chat_id.replace('tg_', ''))
+    
+    try:
+        # Помечаем все сообщения в чате как прочитанные
+        await client.send_read_acknowledge(original_id)
+        print(f"Telegram: чат {chat_id} помечен прочитанным")
+        return {'success': True}
+    except Exception as e:
+        print(f"Ошибка пометки прочитанным Telegram: {e}")
+        return {'success': False, 'error': str(e)}
+
+
 async def authorize_telegram_async(phone, code=None, password=None):
     """Авторизация в Telegram"""
     global telegram_client, phone_code_hash_storage
@@ -393,4 +411,13 @@ def get_telegram_user_info(user_id):
     except Exception as e:
         print(f"Ошибка получения информации о пользователе: {e}")
         return None
+
+
+def mark_telegram_read(chat_id):
+    """Синхронная обертка для пометки чата прочитанным"""
+    try:
+        return run_async(mark_telegram_read_async(chat_id))
+    except Exception as e:
+        print(f"Ошибка пометки чата прочитанным: {e}")
+        return {'success': False, 'error': str(e)}
 
