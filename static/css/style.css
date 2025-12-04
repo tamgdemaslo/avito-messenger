@@ -706,5 +706,106 @@ body {
     }
 }
 
+/* Медиа сообщения (изображения, голосовые, видео) */
+.media-message {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
 
+.media-message:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.message-item.own .media-message {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.message-item.own .media-message:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.media-message svg {
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
+.media-message span {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.image-message svg {
+    stroke: #0088cc;
+}
+
+.voice-message svg {
+    stroke: #00a046;
+}
+
+.video-message svg {
+    stroke: #9c27b0;
+}
+
+.document-message svg {
+    stroke: #ff9800;
+}
+
+
+/* Медиа сообщения (изображения, голосовые, видео) */
+.media-message {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.media-message:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.message-item.own .media-message {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.message-item.own .media-message:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.media-message svg {
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
+.media-message span {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.image-message svg {
+    stroke: #0088cc;
+}
+
+.voice-message svg {
+    stroke: #00a046;
+}
+
+.video-message svg {
+    stroke: #9c27b0;
+}
+
+.document-message svg {
+    stroke: #ff9800;
+}
 
