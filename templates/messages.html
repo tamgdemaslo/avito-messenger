@@ -152,6 +152,38 @@
         <div class="spinner"></div>
     </div>
 
+    <!-- Customer Info Modal -->
+    <div class="modal" id="customerInfoModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Информация о клиенте</h2>
+                <button class="modal-close" onclick="closeCustomerModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Имя</label>
+                    <input type="text" id="customerName" class="form-input" readonly>
+                </div>
+                <div class="form-group">
+                    <label>VIN номер</label>
+                    <input type="text" id="customerVIN" class="form-input" placeholder="Введите VIN">
+                </div>
+                <div class="form-group">
+                    <label>Телефон</label>
+                    <input type="text" id="customerPhone" class="form-input" placeholder="+7 (999) 123-45-67">
+                </div>
+                <div class="form-group">
+                    <label>Комментарии</label>
+                    <textarea id="customerComments" class="form-input" rows="4" placeholder="Добавьте заметки о клиенте..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeCustomerModal()">Отмена</button>
+                <button class="btn btn-primary" onclick="saveCustomerInfo()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>

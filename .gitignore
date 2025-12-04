@@ -45,5 +45,11 @@ avito_crm_session.session
 LOCAL_CREDENTIALS.txt
 *_CREDENTIALS.txt
 
+# Database
+customers.db
+*.db
+*.sqlite
+*.sqlite3
+
 
 

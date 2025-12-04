@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 import json
 import telegram_client
 import whatsapp_client
+import database
 
 # Получаем абсолютный путь к директории проекта
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -800,6 +801,65 @@ def test():
     </body>
     </html>
     """
+
+
+# === API для работы с данными клиентов ===
+
+@app.route('/api/customers/<source>/<source_id>', methods=['GET'])
+def get_customer_info(source, source_id):
+    """Получить информацию о клиенте"""
+    try:
+        customer = database.get_customer(source, source_id)
+        if customer:
+            return jsonify(customer)
+        else:
+            return jsonify({
+                'source': source,
+                'source_id': source_id,
+                'vin': None,
+                'phone': None,
+                'comments': None
+            })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/customers/<source>/<source_id>', methods=['POST'])
+def update_customer_info(source, source_id):
+    """Обновить информацию о клиенте"""
+    try:
+        data = request.json
+        name = data.get('name')
+        vin = data.get('vin')
+        phone = data.get('phone')
+        comments = data.get('comments')
+        
+        customer = database.save_customer(
+            source=source,
+            source_id=source_id,
+            name=name,
+            vin=vin,
+            phone=phone,
+            comments=comments
+        )
+        
+        return jsonify({"success": True, "customer": customer})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/customers/search', methods=['GET'])
+def search_customers():
+    """Поиск клиентов"""
+    try:
+        query = request.args.get('q', '')
+        if not query:
+            return jsonify([])
+        
+        results = database.search_customers(query)
+        return jsonify(results)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == '__main__':

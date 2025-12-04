@@ -736,6 +736,15 @@ function renderChatHeader(chatInfo) {
                 <h2>${escapeHtml(userName)}</h2>
                 ${itemTitle ? `<div class="chat-subtitle">${escapeHtml(itemTitle)}</div>` : ''}
             </div>
+            <div class="chat-header-actions">
+                <button class="btn btn-icon" onclick="openCustomerInfo()" title="Информация о клиенте">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                    </svg>
+                </button>
+            </div>
         </div>
     `;
     
@@ -1181,3 +1190,85 @@ function showError(message) {
 
 
 
+
+// === Работа с информацией о клиентах ===
+
+let currentCustomerSource = null;
+let currentCustomerSourceId = null;
+
+async function openCustomerInfo() {
+    if (!currentChatId) return;
+    
+    const chat = chats.find(c => c.id === currentChatId);
+    if (!chat) return;
+    
+    // Определяем source и source_id
+    currentCustomerSource = chat.source || 'avito';
+    currentCustomerSourceId = chat.id;
+    
+    // Получаем имя пользователя
+    const userName = getChatUserName(chat);
+    
+    // Загружаем информацию о клиенте
+    try {
+        const response = await fetch(`/api/customers/${currentCustomerSource}/${encodeURIComponent(currentCustomerSourceId)}`);
+        const data = await response.json();
+        
+        // Заполняем форму
+        document.getElementById('customerName').value = userName;
+        document.getElementById('customerVIN').value = data.vin || '';
+        document.getElementById('customerPhone').value = data.phone || '';
+        document.getElementById('customerComments').value = data.comments || '';
+        
+        // Показываем модальное окно
+        document.getElementById('customerInfoModal').style.display = 'flex';
+    } catch (error) {
+        showError('Ошибка загрузки данных клиента: ' + error.message);
+    }
+}
+
+function closeCustomerModal() {
+    document.getElementById('customerInfoModal').style.display = 'none';
+}
+
+async function saveCustomerInfo() {
+    const vin = document.getElementById('customerVIN').value.trim();
+    const phone = document.getElementById('customerPhone').value.trim();
+    const comments = document.getElementById('customerComments').value.trim();
+    const name = document.getElementById('customerName').value.trim();
+    
+    try {
+        const response = await fetch(`/api/customers/${currentCustomerSource}/${encodeURIComponent(currentCustomerSourceId)}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name: name,
+                vin: vin,
+                phone: phone,
+                comments: comments
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            closeCustomerModal();
+            // Можно показать уведомление об успехе
+            console.log('✅ Информация о клиенте сохранена');
+        } else {
+            showError('Ошибка сохранения: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        showError('Ошибка сохранения данных: ' + error.message);
+    }
+}
+
+// Закрытие модального окна по клику вне его
+document.addEventListener('click', (e) => {
+    const modal = document.getElementById('customerInfoModal');
+    if (modal && e.target === modal) {
+        closeCustomerModal();
+    }
+});
