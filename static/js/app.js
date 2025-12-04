@@ -728,20 +728,43 @@ function renderChatHeader(chatInfo) {
         }
     }
     
-    // Формируем заголовок с аватаркой, именем пользователя и названием объявления
+    // Загружаем информацию о клиенте
+    const customerSource = chat.source || 'avito';
+    const customerSourceId = chat.id;
+    
+    // Асинхронно загружаем данные клиента
+    fetch(`/api/customers/${customerSource}/${encodeURIComponent(customerSourceId)}`)
+        .then(res => res.json())
+        .then(customerData => {
+            updateChatHeaderWithCustomerInfo(userName, itemTitle, userAvatar, customerData);
+        })
+        .catch(() => {
+            updateChatHeaderWithCustomerInfo(userName, itemTitle, userAvatar, {});
+        });
+    
+    // Сначала показываем без данных клиента
+    updateChatHeaderWithCustomerInfo(userName, itemTitle, userAvatar, {});
+}
+
+function updateChatHeaderWithCustomerInfo(userName, itemTitle, userAvatar, customerData) {
+    // Формируем заголовок с информацией о клиенте
     messagesHeader.innerHTML = `
         <div class="chat-header-wrapper">
             ${userAvatar ? `<img src="${escapeHtml(userAvatar)}" alt="${escapeHtml(userName)}" class="chat-avatar" onerror="this.style.display='none'">` : ''}
             <div class="chat-header-text">
                 <h2>${escapeHtml(userName)}</h2>
                 ${itemTitle ? `<div class="chat-subtitle">${escapeHtml(itemTitle)}</div>` : ''}
+                <div class="customer-info-inline">
+                    ${customerData.vin ? `<span class="customer-badge" title="VIN номер">🚗 ${escapeHtml(customerData.vin)}</span>` : ''}
+                    ${customerData.phone ? `<span class="customer-badge" title="Телефон">📞 ${escapeHtml(customerData.phone)}</span>` : ''}
+                    ${customerData.comments ? `<span class="customer-badge" title="Комментарии">💬 ${escapeHtml(customerData.comments.substring(0, 30))}${customerData.comments.length > 30 ? '...' : ''}</span>` : ''}
+                </div>
             </div>
             <div class="chat-header-actions">
-                <button class="btn btn-icon" onclick="openCustomerInfo()" title="Информация о клиенте">
+                <button class="btn btn-icon" onclick="openCustomerInfo()" title="Редактировать информацию">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="12" y1="16" x2="12" y2="12"></line>
-                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                     </svg>
                 </button>
             </div>
@@ -1255,7 +1278,8 @@ async function saveCustomerInfo() {
         
         if (data.success) {
             closeCustomerModal();
-            // Можно показать уведомление об успехе
+            // Обновляем заголовок чата с новыми данными
+            renderChatHeader(window.currentChatInfo);
             console.log('✅ Информация о клиенте сохранена');
         } else {
             showError('Ошибка сохранения: ' + (data.error || 'Unknown error'));
