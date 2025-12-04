@@ -9,7 +9,7 @@
     "postinstall": "node -e \"console.log('Puppeteer setup complete')\""
   },
   "dependencies": {
-    "whatsapp-web.js": "^1.23.0",
+    "whatsapp-web.js": "^1.25.0",
     "qrcode-terminal": "^0.12.0",
     "express": "^4.18.2",
     "cors": "^2.8.5",

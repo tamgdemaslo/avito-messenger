@@ -140,31 +140,36 @@ app.get('/chats', async (req, res) => {
         const result = [];
 
         for (const chat of privateChats) {
-            const contact = await chat.getContact();
-            const lastMessage = chat.lastMessage;
+            try {
+                const lastMessage = chat.lastMessage;
 
-            const chatData = {
-                id: `wa_${chat.id._serialized}`,
-                source: 'whatsapp',
-                original_id: chat.id._serialized,
-                name: contact.pushname || contact.name || chat.name || 'WhatsApp User',
-                unread_count: chat.unreadCount || 0,
-                created: lastMessage ? lastMessage.timestamp : 0,
-                updated: lastMessage ? lastMessage.timestamp : 0,
-                type: 'private'
-            };
-
-            // Последнее сообщение
-            if (lastMessage) {
-                chatData.last_message = {
-                    id: lastMessage.id._serialized,
-                    text: lastMessage.body || '',
-                    created: lastMessage.timestamp,
-                    from_id: lastMessage.from
+                const chatData = {
+                    id: `wa_${chat.id._serialized}`,
+                    source: 'whatsapp',
+                    original_id: chat.id._serialized,
+                    name: chat.name || 'WhatsApp User',
+                    unread_count: chat.unreadCount || 0,
+                    created: lastMessage ? lastMessage.timestamp : 0,
+                    updated: lastMessage ? lastMessage.timestamp : 0,
+                    type: 'private',
+                    has_photo: false
                 };
-            }
 
-            result.push(chatData);
+                // Последнее сообщение
+                if (lastMessage) {
+                    chatData.last_message = {
+                        id: lastMessage.id._serialized,
+                        text: lastMessage.body || '',
+                        created: lastMessage.timestamp,
+                        from_id: lastMessage.from
+                    };
+                }
+
+                result.push(chatData);
+            } catch (error) {
+                console.log(`⚠️ Ошибка обработки чата ${chat.id._serialized}:`, error.message);
+                continue;
+            }
         }
 
         res.json(result);
