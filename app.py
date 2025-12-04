@@ -146,25 +146,26 @@ def get_chats():
     all_chats = []
     current_user_id = None
     
-    # === AVITO ЧАТЫ (ОТКЛЮЧЕНО - требует платную подписку) ===
-    # profile, error = make_avito_request("GET", "/core/v1/accounts/self")
-    # if not error and profile:
-    #     user_id = profile.get('id')
-    #     current_user_id = user_id
-    #     
-    #     if user_id:
-    #         print(f"Got Avito user_id: {user_id}")
-    #         chats_data, chats_error = make_avito_request("GET", f"/messenger/v2/accounts/{user_id}/chats")
-    #         
-    #         if not chats_error and chats_data and isinstance(chats_data, dict) and 'chats' in chats_data:
-    #             avito_chats = chats_data['chats']
-    #             # Помечаем как Avito
-    #             for chat in avito_chats:
-    #                 chat['source'] = 'avito'
-    #                 chat['source_icon'] = 'avito'
-    #             all_chats.extend(avito_chats)
-    #             print(f"Loaded {len(avito_chats)} Avito chats")
-    print("⚠️ Avito API отключен (требуется платная подписка)")
+    # === AVITO ЧАТЫ ===
+    profile, error = make_avito_request("GET", "/core/v1/accounts/self")
+    if not error and profile:
+        user_id = profile.get('id')
+        current_user_id = user_id
+        
+        if user_id:
+            print(f"Got Avito user_id: {user_id}")
+            chats_data, chats_error = make_avito_request("GET", f"/messenger/v2/accounts/{user_id}/chats")
+            
+            if not chats_error and chats_data and isinstance(chats_data, dict) and 'chats' in chats_data:
+                avito_chats = chats_data['chats']
+                # Помечаем как Avito
+                for chat in avito_chats:
+                    chat['source'] = 'avito'
+                    chat['source_icon'] = 'avito'
+                all_chats.extend(avito_chats)
+                print(f"Loaded {len(avito_chats)} Avito chats")
+            elif chats_error:
+                print(f"⚠️ Avito error (может требоваться подписка): {chats_error}")
     
     # === TELEGRAM ЧАТЫ ===
     try:
