@@ -41,5 +41,9 @@ check.py
 *.session-journal
 avito_crm_session.session
 
+# Local credentials (NEVER commit)
+LOCAL_CREDENTIALS.txt
+*_CREDENTIALS.txt
+
 
 
