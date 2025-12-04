@@ -41,8 +41,14 @@ function initWhatsAppClient() {
                 '--disable-accelerated-2d-canvas',
                 '--no-first-run',
                 '--no-zygote',
-                '--disable-gpu'
-            ]
+                '--single-process',
+                '--disable-gpu',
+                '--disable-extensions',
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-renderer-backgrounding'
+            ],
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
         }
     });
 
