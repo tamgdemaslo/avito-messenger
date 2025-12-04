@@ -9,6 +9,10 @@ import requests
 # URL микросервиса WhatsApp
 WHATSAPP_SERVICE_URL = os.environ.get('WHATSAPP_SERVICE_URL', 'http://localhost:3001')
 
+# Добавляем https:// если не указан протокол
+if WHATSAPP_SERVICE_URL and not WHATSAPP_SERVICE_URL.startswith(('http://', 'https://')):
+    WHATSAPP_SERVICE_URL = f'https://{WHATSAPP_SERVICE_URL}'
+
 
 def get_whatsapp_status():
     """Проверить статус WhatsApp клиента"""
