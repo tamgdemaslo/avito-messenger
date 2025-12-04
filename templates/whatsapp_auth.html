@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Авторизация</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .qr-code-container {
+            margin: 20px 0;
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .qr-code-container img {
+            max-width: 300px;
+            width: 100%;
+            height: auto;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-indicator.ready {
+            background: #00a046;
+        }
+        
+        .status-indicator.loading {
+            background: #ffa500;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .status-indicator.error {
+            background: #dc3545;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="login-card">
+            <div class="logo">
+                <h1>WhatsApp Авторизация</h1>
+                <p>Подключите WhatsApp к CRM</p>
+            </div>
+            
+            <div class="login-content">
+                <!-- Статус -->
+                <div id="statusBlock" style="margin-bottom: 20px; padding: 12px; background: #f8f9fa; border-radius: 8px; text-align: center;">
+                    <span class="status-indicator loading"></span>
+                    <span id="statusText">Проверка статуса...</span>
+                </div>
+                
+                <!-- QR код -->
+                <div id="qrBlock" style="display: none;">
+                    <p class="description">
+                        Отсканируйте QR-код в WhatsApp:
+                    </p>
+                    <ol style="text-align: left; padding-left: 20px; margin: 16px 0;">
+                        <li>Откройте WhatsApp на телефоне</li>
+                        <li>Нажмите "Настройки" → "Связанные устройства"</li>
+                        <li>Нажмите "Привязать устройство"</li>
+                        <li>Отсканируйте этот QR-код</li>
+                    </ol>
+                    <div class="qr-code-container">
+                        <img id="qrImage" src="" alt="QR код">
+                    </div>
+                </div>
+                
+                <!-- Успех -->
+                <div id="successBlock" style="display: none;">
+                    <p class="description" style="color: #00a046; font-size: 18px;">
+                        ✅ WhatsApp успешно подключен!
+                    </p>
+                    <a href="/messages" class="btn btn-primary">
+                        Перейти к сообщениям
+                    </a>
+                </div>
+                
+                <!-- Ошибка -->
+                <div id="errorBlock" style="display: none; color: red; margin-top: 16px;"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let checkInterval = null;
+        
+        async function checkStatus() {
+            try {
+                const response = await fetch('/api/whatsapp/status');
+                const data = await response.json();
+                
+                const statusIndicator = document.querySelector('.status-indicator');
+                const statusText = document.getElementById('statusText');
+                const qrBlock = document.getElementById('qrBlock');
+                const successBlock = document.getElementById('successBlock');
+                
+                if (data.ready) {
+                    // WhatsApp готов
+                    statusIndicator.className = 'status-indicator ready';
+                    statusText.textContent = 'WhatsApp подключен';
+                    qrBlock.style.display = 'none';
+                    successBlock.style.display = 'block';
+                    
+                    if (checkInterval) {
+                        clearInterval(checkInterval);
+                    }
+                } else if (data.authenticating || data.hasQR) {
+                    // Нужна авторизация
+                    statusIndicator.className = 'status-indicator loading';
+                    statusText.textContent = 'Ожидание авторизации...';
+                    qrBlock.style.display = 'block';
+                    successBlock.style.display = 'none';
+                    
+                    // Загружаем QR код
+                    loadQR();
+                } else {
+                    // Инициализация
+                    statusIndicator.className = 'status-indicator loading';
+                    statusText.textContent = 'Инициализация WhatsApp...';
+                    qrBlock.style.display = 'none';
+                    successBlock.style.display = 'none';
+                }
+            } catch (error) {
+                const statusIndicator = document.querySelector('.status-indicator');
+                const statusText = document.getElementById('statusText');
+                statusIndicator.className = 'status-indicator error';
+                statusText.textContent = 'Ошибка подключения к WhatsApp сервису';
+                showError('Убедитесь что WhatsApp сервис запущен');
+            }
+        }
+        
+        async function loadQR() {
+            try {
+                const response = await fetch('/api/whatsapp/qr');
+                const data = await response.json();
+                
+                if (data.qr) {
+                    document.getElementById('qrImage').src = data.qr;
+                }
+            } catch (error) {
+                console.log('QR не доступен:', error);
+            }
+        }
+        
+        function showError(message) {
+            const errorBlock = document.getElementById('errorBlock');
+            errorBlock.textContent = message;
+            errorBlock.style.display = 'block';
+        }
+        
+        // Проверяем статус каждые 2 секунды
+        checkStatus();
+        checkInterval = setInterval(checkStatus, 2000);
+    </script>
+</body>
+</html>
+

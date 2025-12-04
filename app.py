@@ -12,6 +12,7 @@ import os
 from datetime import datetime, timedelta
 import json
 import telegram_client
+import whatsapp_client
 
 # Получаем абсолютный путь к директории проекта
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -173,6 +174,15 @@ def get_chats():
     except Exception as e:
         print(f"Telegram chats error (skipping): {e}")
     
+    # === WHATSAPP ЧАТЫ ===
+    try:
+        whatsapp_chats = whatsapp_client.get_whatsapp_chats(limit=30)
+        if whatsapp_chats:
+            print(f"Loaded {len(whatsapp_chats)} WhatsApp chats")
+            all_chats.extend(whatsapp_chats)
+    except Exception as e:
+        print(f"WhatsApp chats error (skipping): {e}")
+    
     # Сортируем по времени обновления (новые сверху)
     all_chats.sort(key=lambda x: x.get('updated', 0), reverse=True)
     
@@ -183,7 +193,8 @@ def get_chats():
         "current_user_id": current_user_id,
         "sources": {
             "avito": len([c for c in all_chats if c.get('source') == 'avito']),
-            "telegram": len([c for c in all_chats if c.get('source') == 'telegram'])
+            "telegram": len([c for c in all_chats if c.get('source') == 'telegram']),
+            "whatsapp": len([c for c in all_chats if c.get('source') == 'whatsapp'])
         }
     })
 
@@ -236,11 +247,27 @@ def get_messages():
 
 @app.route('/api/chats/<chat_id>/messages', methods=['GET'])
 def get_chat_messages(chat_id):
-    """Получить сообщения конкретного чата (Avito или Telegram)"""
+    """Получить сообщения конкретного чата (Avito, Telegram или WhatsApp)"""
     print(f"Fetching messages for chat_id: {chat_id}")
     
     # Определяем источник по префиксу ID
-    if chat_id.startswith('tg_'):
+    if chat_id.startswith('wa_'):
+        # === WHATSAPP ===
+        try:
+            messages_list = whatsapp_client.get_whatsapp_messages(chat_id, limit=30)
+            
+            return jsonify({
+                "messages": messages_list,
+                "chat_id": chat_id,
+                "chat_info": None,
+                "current_user_id": None,
+                "source": "whatsapp"
+            })
+        except Exception as e:
+            print(f"WhatsApp messages error: {e}")
+            return jsonify({"error": f"WhatsApp error: {str(e)}"}), 500
+    
+    elif chat_id.startswith('tg_'):
         # === TELEGRAM ===
         try:
             messages_list = telegram_client.get_telegram_messages(chat_id, limit=30)
@@ -322,7 +349,7 @@ def get_chat_messages(chat_id):
 
 @app.route('/api/messages/send', methods=['POST'])
 def send_message():
-    """Отправить сообщение (Avito или Telegram)"""
+    """Отправить сообщение (Avito, Telegram или WhatsApp)"""
     data = request.json
     chat_id = data.get('chat_id')
     message_text = data.get('message')
@@ -331,7 +358,18 @@ def send_message():
         return jsonify({"error": "chat_id and message are required"}), 400
     
     # Определяем источник
-    if chat_id.startswith('tg_'):
+    if chat_id.startswith('wa_'):
+        # === WHATSAPP ===
+        try:
+            result = whatsapp_client.send_whatsapp_message(chat_id, message_text)
+            if result and result.get('success'):
+                return jsonify({"success": True, "data": result})
+            else:
+                return jsonify({"error": result.get('error', 'Unknown error')}), 500
+        except Exception as e:
+            return jsonify({"error": f"WhatsApp error: {str(e)}"}), 500
+    
+    elif chat_id.startswith('tg_'):
         # === TELEGRAM ===
         try:
             result = telegram_client.send_telegram_message(chat_id, message_text)
@@ -403,10 +441,21 @@ def delete_message():
 
 @app.route('/api/chats/<chat_id>/read', methods=['POST'])
 def mark_chat_read(chat_id):
-    """Пометить чат как прочитанный (Avito или Telegram)"""
+    """Пометить чат как прочитанный (Avito, Telegram или WhatsApp)"""
     
     # Определяем источник по префиксу ID
-    if chat_id.startswith('tg_'):
+    if chat_id.startswith('wa_'):
+        # === WHATSAPP ===
+        try:
+            result = whatsapp_client.mark_whatsapp_read(chat_id)
+            if result and result.get('success'):
+                return jsonify({"success": True})
+            else:
+                return jsonify({"error": result.get('error', 'Unknown error')}), 500
+        except Exception as e:
+            return jsonify({"error": f"WhatsApp error: {str(e)}"}), 500
+    
+    elif chat_id.startswith('tg_'):
         # === TELEGRAM ===
         try:
             result = telegram_client.mark_telegram_read(chat_id)
@@ -690,6 +739,35 @@ def telegram_status():
 def telegram_auth_page():
     """Страница авторизации Telegram"""
     return render_template('telegram_auth.html')
+
+
+@app.route('/whatsapp/auth')
+def whatsapp_auth_page():
+    """Страница авторизации WhatsApp"""
+    return render_template('whatsapp_auth.html')
+
+
+@app.route('/api/whatsapp/status', methods=['GET'])
+def whatsapp_status():
+    """Проверить статус WhatsApp клиента"""
+    try:
+        status = whatsapp_client.get_whatsapp_status()
+        return jsonify(status)
+    except Exception as e:
+        return jsonify({"ready": False, "error": str(e)})
+
+
+@app.route('/api/whatsapp/qr', methods=['GET'])
+def whatsapp_qr():
+    """Получить QR код для авторизации WhatsApp"""
+    try:
+        qr_data = whatsapp_client.get_whatsapp_qr()
+        if qr_data:
+            return jsonify(qr_data)
+        else:
+            return jsonify({"error": "QR код не доступен"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/api/telegram/avatar/<chat_id>', methods=['GET'])

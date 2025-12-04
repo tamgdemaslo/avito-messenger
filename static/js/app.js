@@ -322,7 +322,9 @@ async function lazyLoadTelegramAvatars() {
 
 // Helper функции для извлечения данных чата
 function getChatUserName(chat) {
-    if (chat.source === 'telegram') {
+    if (chat.source === 'whatsapp') {
+        return chat.name || 'WhatsApp User';
+    } else if (chat.source === 'telegram') {
         return chat.name || 'Telegram Chat';
     } else {
         if (chat.users && chat.users.length > 0) {
@@ -378,8 +380,13 @@ function renderChats() {
         let userName = 'Пользователь';
         let userAvatar = '';
         
+        // === WHATSAPP ===
+        if (chat.source === 'whatsapp') {
+            userName = chat.name || 'WhatsApp User';
+            userAvatar = ''; // WhatsApp без аватарок (пока)
+        }
         // === TELEGRAM ===
-        if (chat.source === 'telegram') {
+        else if (chat.source === 'telegram') {
             userName = chat.name || 'Telegram Chat';
             userAvatar = chat.avatar || '';
         }
@@ -422,21 +429,27 @@ function renderChats() {
         
         // Определяем источник чата - компактные иконки
         const source = chat.source || 'avito';
-        const sourceBadge = source === 'telegram' 
-            ? `<span class="source-badge source-badge-telegram" title="Telegram">
+        let sourceBadge = '';
+        
+        if (source === 'whatsapp') {
+            sourceBadge = '<span class="source-badge source-badge-whatsapp" title="WhatsApp">W</span>';
+        } else if (source === 'telegram') {
+            sourceBadge = `<span class="source-badge source-badge-telegram" title="Telegram">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="white">
                     <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161c-.18 1.897-.962 6.502-1.359 8.627-.168.9-.5 1.201-.82 1.23-.697.064-1.226-.461-1.901-.903-1.056-.692-1.653-1.123-2.678-1.799-1.185-.781-.417-1.21.258-1.911.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.139-5.062 3.345-.479.329-.913.489-1.302.481-.428-.009-1.252-.241-1.865-.44-.752-.244-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.831-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.477-1.635.099-.002.321-.022.465.138.121.134.154.315.17.46-.002.104-.005.677-.01.962z"/>
                 </svg>
-               </span>`
-            : '<span class="source-badge source-badge-avito" title="Avito">A</span>';
+               </span>`;
+        } else {
+            sourceBadge = '<span class="source-badge source-badge-avito" title="Avito">A</span>';
+        }
         
         // Проверяем непрочитанные сообщения
         const unreadCount = chat.unread_count || 0;
         
-        // Для Telegram используем unread_count
-        // Для Avito проверяем последнее сообщение
+        // Определяем непрочитанные по источнику
         let isUnread = false;
-        if (chat.source === 'telegram') {
+        if (chat.source === 'whatsapp' || chat.source === 'telegram') {
+            // WhatsApp и Telegram используют unread_count
             isUnread = unreadCount > 0;
         } else {
             // Avito: проверяем, что последнее сообщение входящее и не прочитано
@@ -654,8 +667,14 @@ function renderChatHeader(chatInfo) {
     let itemTitle = '';
     
     if (chat) {
+        // === WHATSAPP ===
+        if (chat.source === 'whatsapp') {
+            userName = chat.name || 'WhatsApp User';
+            userAvatar = '';
+            itemTitle = 'WhatsApp';
+        }
         // === TELEGRAM ===
-        if (chat.source === 'telegram') {
+        else if (chat.source === 'telegram') {
             userName = chat.name || 'Telegram Chat';
             userAvatar = chat.avatar || '';
             itemTitle = chat.type === 'channel' ? 'Канал' : (chat.type === 'group' ? 'Группа' : '');

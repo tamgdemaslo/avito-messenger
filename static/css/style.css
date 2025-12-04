@@ -310,6 +310,11 @@ body {
     color: white;
 }
 
+.source-badge-whatsapp {
+    background: #25D366;
+    color: white;
+}
+
 .chat-item-time {
     font-size: 12px;
     color: var(--text-secondary);
