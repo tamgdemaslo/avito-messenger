@@ -74,22 +74,36 @@ def get_user_token():
         }
         
         print(f"YClients: Получаем User Token для {YCLIENTS_LOGIN[:3]}***")
+        print(f"YClients Auth URL: {url}")
+        print(f"YClients Auth Headers: {headers}")
+        
         response = requests.post(url, headers=headers, json=payload, timeout=10)
+        
+        print(f"YClients Auth Response Status: {response.status_code}")
+        print(f"YClients Auth Response: {response.text[:500]}")
         
         if response.status_code == 201:
             result = response.json()
+            print(f"YClients Auth JSON: {result}")
             YCLIENTS_USER_TOKEN = result.get('user_token')
-            print(f"✅ YClients: User Token получен ({YCLIENTS_USER_TOKEN[:10]}...)")
-            return YCLIENTS_USER_TOKEN
+            if YCLIENTS_USER_TOKEN:
+                print(f"✅ YClients: User Token получен ({YCLIENTS_USER_TOKEN[:10]}...)")
+                return YCLIENTS_USER_TOKEN
+            else:
+                print("❌ YClients: user_token не найден в ответе")
+                return None
         elif response.status_code == 200:
             # Требуется 2FA
-            print("⚠️ YClients: Требуется код подтверждения 2FA (пока не поддерживается)")
+            result = response.json()
+            print(f"⚠️ YClients: Требуется код подтверждения 2FA: {result}")
             return None
         else:
-            print(f"❌ YClients: Ошибка авторизации {response.status_code}: {response.text[:200]}")
+            print(f"❌ YClients: Ошибка авторизации {response.status_code}: {response.text[:500]}")
             return None
     except Exception as e:
         print(f"❌ YClients: Ошибка получения User Token: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
