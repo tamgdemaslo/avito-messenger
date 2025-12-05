@@ -14,6 +14,9 @@ log = logging.getLogger(__name__)
 YCLIENTS_PARTNER_TOKEN = os.environ.get('YCLIENTS_PARTNER_TOKEN', '')
 YCLIENTS_COMPANY_ID = int(os.environ.get('YCLIENTS_COMPANY_ID', '0'))
 
+# Логирование конфигурации
+print(f"YClients Config: Token={'***' if YCLIENTS_PARTNER_TOKEN else 'NOT SET'}, Company ID={YCLIENTS_COMPANY_ID}")
+
 API = "https://api.yclients.com/api/v1"
 HEADERS = {
     "Authorization": f"Bearer {YCLIENTS_PARTNER_TOKEN}",
@@ -26,11 +29,22 @@ def _get(path, params=None):
     """Внутренний GET запрос"""
     url = API + path
     try:
+        print(f"YClients GET: {url}")
+        print(f"YClients Headers: Authorization={HEADERS['Authorization'][:20]}...")
+        
         response = requests.get(url, headers=HEADERS, params=params or {}, timeout=10)
+        print(f"YClients Response Status: {response.status_code}")
+        
         response.raise_for_status()
         result = response.json()
-        return result.get('data', {})
+        
+        print(f"YClients Response Keys: {result.keys()}")
+        data = result.get('data', result)  # Если нет 'data', возвращаем весь результат
+        print(f"YClients Data Type: {type(data)}, Length: {len(data) if isinstance(data, (list, dict)) else 'N/A'}")
+        
+        return data
     except Exception as e:
+        print(f"YClients GET error ({url}): {e}")
         log.error(f"YClients GET error ({url}): {e}")
         raise
 

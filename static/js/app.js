@@ -1308,23 +1308,45 @@ function closeYClientsModal() {
 }
 
 async function loadServices() {
+    const select = document.getElementById('bookingService');
+    select.innerHTML = '<option value="">Загрузка услуг...</option>';
+    
     try {
         const response = await fetch('/api/yclients/services');
-        const services = await response.json();
+        const data = await response.json();
         
-        const select = document.getElementById('bookingService');
+        console.log('YClients services response:', data);
+        
         select.innerHTML = '<option value="">Выберите услугу...</option>';
         
-        if (Array.isArray(services)) {
-            services.forEach(service => {
-                const option = document.createElement('option');
-                option.value = service.id;
-                option.textContent = `${service.title} - ${service.price_min} ₽`;
-                select.appendChild(option);
-            });
+        // Проверяем разные форматы ответа
+        let services = [];
+        if (Array.isArray(data)) {
+            services = data;
+        } else if (data.services && Array.isArray(data.services)) {
+            services = data.services;
+        } else if (data.data && Array.isArray(data.data)) {
+            services = data.data;
         }
+        
+        if (services.length === 0) {
+            select.innerHTML = '<option value="">❌ Услуги не найдены</option>';
+            console.error('No services found. Check YClients token and company_id');
+            return;
+        }
+        
+        services.forEach(service => {
+            const option = document.createElement('option');
+            option.value = service.id;
+            const price = service.price_min || service.price || 0;
+            option.textContent = `${service.title} - ${price} ₽`;
+            select.appendChild(option);
+        });
+        
+        console.log(`✅ Loaded ${services.length} services`);
     } catch (error) {
         console.error('Ошибка загрузки услуг:', error);
+        select.innerHTML = '<option value="">❌ Ошибка загрузки</option>';
     }
 }
 

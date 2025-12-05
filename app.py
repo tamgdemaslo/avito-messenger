@@ -887,9 +887,15 @@ def yclients_status():
 def get_yclients_services():
     """Получить список услуг YClients"""
     try:
+        if not yclients_client.is_yclients_configured():
+            return jsonify({"error": "YClients не настроен. Добавьте YCLIENTS_PARTNER_TOKEN и YCLIENTS_COMPANY_ID"}), 400
+        
+        print(f"Loading YClients services for company {yclients_client.YCLIENTS_COMPANY_ID}")
         services = yclients_client.get_services()
+        print(f"YClients returned {len(services) if isinstance(services, list) else 'unknown'} services")
         return jsonify(services)
     except Exception as e:
+        print(f"YClients services error: {e}")
         return jsonify({"error": str(e)}), 500
 
 
