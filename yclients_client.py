@@ -85,7 +85,9 @@ def get_user_token():
         if response.status_code == 201:
             result = response.json()
             print(f"YClients Auth JSON: {result}")
-            YCLIENTS_USER_TOKEN = result.get('user_token')
+            # YClients API возвращает {success, data, meta}, токен внутри data
+            data = result.get('data', {})
+            YCLIENTS_USER_TOKEN = data.get('user_token')
             if YCLIENTS_USER_TOKEN:
                 print(f"✅ YClients: User Token получен ({YCLIENTS_USER_TOKEN[:10]}...)")
                 return YCLIENTS_USER_TOKEN
