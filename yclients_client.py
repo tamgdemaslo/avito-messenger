@@ -18,11 +18,16 @@ YCLIENTS_COMPANY_ID = int(os.environ.get('YCLIENTS_COMPANY_ID', '0'))
 print(f"YClients Config: Token={'***' if YCLIENTS_PARTNER_TOKEN else 'NOT SET'}, Company ID={YCLIENTS_COMPANY_ID}")
 
 API = "https://api.yclients.com/api/v1"
+
+# YClients использует Bearer токен И User-Token
 HEADERS = {
     "Authorization": f"Bearer {YCLIENTS_PARTNER_TOKEN}",
     "Accept": "application/vnd.yclients.v2+json",
-    "Content-Type": "application/json",
+    "Content-Type": "application/json"
 }
+
+# Логирование конфигурации
+print(f"YClients Config: Token={'***' if YCLIENTS_PARTNER_TOKEN else 'NOT SET'} (len={len(YCLIENTS_PARTNER_TOKEN)}), Company ID={YCLIENTS_COMPANY_ID}")
 
 
 def _get(path, params=None):
@@ -69,8 +74,8 @@ def _post(path, json_data):
 def get_services(company_id=None):
     """Получить список услуг"""
     cid = company_id or YCLIENTS_COMPANY_ID
-    # Правильный endpoint: /company/{company_id}/services
-    return _get(f"/company/{cid}/services")
+    # Используем /book_services как в вашем старом коде
+    return _get(f"/book_services/{cid}")
 
 
 def get_staff(company_id=None, service_ids=None):
@@ -79,8 +84,8 @@ def get_staff(company_id=None, service_ids=None):
     params = {}
     if service_ids:
         params["service_ids[]"] = service_ids
-    # Правильный endpoint: /company/{company_id}/staff
-    return _get(f"/company/{cid}/staff", params)
+    # Используем /book_staff как в вашем старом коде
+    return _get(f"/book_staff/{cid}", params)
 
 
 def get_book_dates(company_id=None):
