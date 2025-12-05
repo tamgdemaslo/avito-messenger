@@ -179,10 +179,15 @@ def get_chats():
     
     # === WHATSAPP ЧАТЫ ===
     try:
-        whatsapp_chats = whatsapp_client.get_whatsapp_chats(limit=30)
-        if whatsapp_chats:
-            print(f"Loaded {len(whatsapp_chats)} WhatsApp chats")
-            all_chats.extend(whatsapp_chats)
+        # Сначала проверяем статус
+        status = whatsapp_client.get_whatsapp_status()
+        if status.get('ready'):
+            whatsapp_chats = whatsapp_client.get_whatsapp_chats(limit=30)
+            if whatsapp_chats:
+                print(f"Loaded {len(whatsapp_chats)} WhatsApp chats")
+                all_chats.extend(whatsapp_chats)
+        else:
+            print(f"⚠️ WhatsApp not ready: {status}")
     except Exception as e:
         print(f"WhatsApp chats error (skipping): {e}")
     

@@ -13,6 +13,12 @@ WHATSAPP_SERVICE_URL = os.environ.get('WHATSAPP_SERVICE_URL', 'http://localhost:
 if WHATSAPP_SERVICE_URL and not WHATSAPP_SERVICE_URL.startswith(('http://', 'https://')):
     WHATSAPP_SERVICE_URL = f'https://{WHATSAPP_SERVICE_URL}'
 
+# Убираем :3001 если это публичный Railway URL (Railway использует стандартный 443)
+if 'railway.app' in WHATSAPP_SERVICE_URL and ':3001' in WHATSAPP_SERVICE_URL:
+    WHATSAPP_SERVICE_URL = WHATSAPP_SERVICE_URL.replace(':3001', '')
+    
+print(f"WhatsApp Service URL: {WHATSAPP_SERVICE_URL}")
+
 
 def get_whatsapp_status():
     """Проверить статус WhatsApp клиента"""

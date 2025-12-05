@@ -10,6 +10,10 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const INTERNAL_PORT = 3001; // Для внутренних подключений
+
+// Если Railway изменяет порт, логируем оба
+console.log(`🟢 WhatsApp будет доступен на портах: ${PORT} (external), ${INTERNAL_PORT} (internal)`);
 
 app.use(cors());
 app.use(express.json());
