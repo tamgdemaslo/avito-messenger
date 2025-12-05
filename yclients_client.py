@@ -13,6 +13,9 @@ log = logging.getLogger(__name__)
 # Конфигурация YClients
 YCLIENTS_PARTNER_TOKEN = os.environ.get('YCLIENTS_PARTNER_TOKEN', '')
 YCLIENTS_COMPANY_ID = int(os.environ.get('YCLIENTS_COMPANY_ID', '0'))
+YCLIENTS_LOGIN = os.environ.get('YCLIENTS_LOGIN', '')  # Email или телефон
+YCLIENTS_PASSWORD = os.environ.get('YCLIENTS_PASSWORD', '')  # Пароль
+YCLIENTS_USER_TOKEN = None  # Будет получен при первом запросе
 
 # Детальная проверка конфигурации
 if not YCLIENTS_PARTNER_TOKEN:
@@ -47,9 +50,63 @@ BOOKING_HEADERS = {
 print(f"YClients Config: Token={'***' if YCLIENTS_PARTNER_TOKEN else 'NOT SET'} (len={len(YCLIENTS_PARTNER_TOKEN) if YCLIENTS_PARTNER_TOKEN else 0}), Company ID={YCLIENTS_COMPANY_ID}")
 
 
-def _get(path, params=None, headers=None):
+def get_user_token():
+    """Получить User Token через авторизацию"""
+    global YCLIENTS_USER_TOKEN
+    
+    if YCLIENTS_USER_TOKEN:
+        return YCLIENTS_USER_TOKEN
+    
+    if not YCLIENTS_LOGIN or not YCLIENTS_PASSWORD:
+        print("⚠️ YClients: YCLIENTS_LOGIN или YCLIENTS_PASSWORD не установлены, User Token недоступен")
+        return None
+    
+    try:
+        url = f"{API}/auth"
+        headers = {
+            "Authorization": f"Bearer {YCLIENTS_PARTNER_TOKEN}",
+            "Accept": "application/vnd.yclients.v2+json",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "login": YCLIENTS_LOGIN,
+            "password": YCLIENTS_PASSWORD
+        }
+        
+        print(f"YClients: Получаем User Token для {YCLIENTS_LOGIN[:3]}***")
+        response = requests.post(url, headers=headers, json=payload, timeout=10)
+        
+        if response.status_code == 201:
+            result = response.json()
+            YCLIENTS_USER_TOKEN = result.get('user_token')
+            print(f"✅ YClients: User Token получен ({YCLIENTS_USER_TOKEN[:10]}...)")
+            return YCLIENTS_USER_TOKEN
+        elif response.status_code == 200:
+            # Требуется 2FA
+            print("⚠️ YClients: Требуется код подтверждения 2FA (пока не поддерживается)")
+            return None
+        else:
+            print(f"❌ YClients: Ошибка авторизации {response.status_code}: {response.text[:200]}")
+            return None
+    except Exception as e:
+        print(f"❌ YClients: Ошибка получения User Token: {e}")
+        return None
+
+
+def _get(path, params=None, headers=None, use_user_token=False):
     """Внутренний GET запрос"""
     url = API + path
+    
+    # Если требуется User Token, получаем его
+    if use_user_token:
+        user_token = get_user_token()
+        if user_token:
+            headers = {
+                "Authorization": f"Bearer {YCLIENTS_PARTNER_TOKEN}",
+                "Accept": "application/vnd.yclients.v2+json",
+                "Content-Type": "application/json"
+            }
+    
     request_headers = headers or HEADERS
     try:
         print(f"YClients GET: {url}")
@@ -105,20 +162,44 @@ def _post(path, json_data):
 # ═══════════════════════════════════════════════════════════
 
 def get_services(company_id=None):
-    """Получить список услуг"""
+    """Получить список услуг - требует User Token"""
     cid = company_id or YCLIENTS_COMPANY_ID
-    # Используем booking endpoint (работает с Partner Token)
-    return _get(f"/book_services/{cid}")
+    
+    # Получаем User Token
+    user_token = get_user_token()
+    if not user_token:
+        print("⚠️ YClients: Не удалось получить User Token для загрузки услуг")
+        return []
+    
+    # Используем /company/{id}/services с User Token вместо Partner Token
+    headers = {
+        "Authorization": f"Bearer {user_token}",
+        "Accept": "application/vnd.yclients.v2+json",
+        "Content-Type": "application/json"
+    }
+    return _get(f"/company/{cid}/services", headers=headers)
 
 
 def get_staff(company_id=None, service_ids=None):
-    """Получить список мастеров"""
+    """Получить список мастеров - требует User Token"""
     cid = company_id or YCLIENTS_COMPANY_ID
     params = {}
     if service_ids:
         params["service_ids[]"] = service_ids
-    # Используем booking endpoint (работает с Partner Token)
-    return _get(f"/book_staff/{cid}", params)
+    
+    # Получаем User Token
+    user_token = get_user_token()
+    if not user_token:
+        print("⚠️ YClients: Не удалось получить User Token для загрузки мастеров")
+        return []
+    
+    # Используем /company/{id}/staff с User Token
+    headers = {
+        "Authorization": f"Bearer {user_token}",
+        "Accept": "application/vnd.yclients.v2+json",
+        "Content-Type": "application/json"
+    }
+    return _get(f"/company/{cid}/staff", params, headers=headers)
 
 
 def get_book_dates(company_id=None):
