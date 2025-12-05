@@ -178,44 +178,58 @@ def _post(path, json_data):
 # ═══════════════════════════════════════════════════════════
 
 def get_services(company_id=None):
-    """Получить список услуг - требует User Token"""
+    """Получить список услуг доступных для бронирования"""
     cid = company_id or YCLIENTS_COMPANY_ID
     
-    # Получаем User Token
-    user_token = get_user_token()
-    if not user_token:
-        print("⚠️ YClients: Не удалось получить User Token для загрузки услуг")
-        return []
-    
-    # Используем /company/{id}/services с User Token вместо Partner Token
-    headers = {
-        "Authorization": f"Bearer {user_token}",
-        "Accept": "application/vnd.yclients.v2+json",
-        "Content-Type": "application/json"
-    }
-    return _get(f"/company/{cid}/services", headers=headers)
+    # Сначала пробуем booking endpoint с Partner Token (документация: GET /book_services/{company_id})
+    try:
+        print(f"YClients: Попытка загрузить услуги через /book_services/{cid} (Partner Token)")
+        return _get(f"/book_services/{cid}")
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 404:
+            # Если booking endpoint недоступен (форма записи не настроена), используем User Token
+            print(f"YClients: /book_services/ недоступен (404), пробуем через /company/services/ (User Token)")
+            user_token = get_user_token()
+            if not user_token:
+                print("⚠️ YClients: Не удалось получить User Token")
+                return []
+            
+            headers = {
+                "Authorization": f"Bearer {user_token}",
+                "Accept": "application/vnd.yclients.v2+json",
+                "Content-Type": "application/json"
+            }
+            return _get(f"/company/{cid}/services", headers=headers)
+        raise
 
 
 def get_staff(company_id=None, service_ids=None):
-    """Получить список мастеров - требует User Token"""
+    """Получить список сотрудников доступных для бронирования"""
     cid = company_id or YCLIENTS_COMPANY_ID
     params = {}
     if service_ids:
         params["service_ids[]"] = service_ids
     
-    # Получаем User Token
-    user_token = get_user_token()
-    if not user_token:
-        print("⚠️ YClients: Не удалось получить User Token для загрузки мастеров")
-        return []
-    
-    # Используем /company/{id}/staff с User Token
-    headers = {
-        "Authorization": f"Bearer {user_token}",
-        "Accept": "application/vnd.yclients.v2+json",
-        "Content-Type": "application/json"
-    }
-    return _get(f"/company/{cid}/staff", params, headers=headers)
+    # Сначала пробуем booking endpoint с Partner Token (документация: GET /book_staff/{company_id})
+    try:
+        print(f"YClients: Попытка загрузить сотрудников через /book_staff/{cid} (Partner Token)")
+        return _get(f"/book_staff/{cid}", params)
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 404:
+            # Если booking endpoint недоступен, используем User Token
+            print(f"YClients: /book_staff/ недоступен (404), пробуем через /company/staff/ (User Token)")
+            user_token = get_user_token()
+            if not user_token:
+                print("⚠️ YClients: Не удалось получить User Token")
+                return []
+            
+            headers = {
+                "Authorization": f"Bearer {user_token}",
+                "Accept": "application/vnd.yclients.v2+json",
+                "Content-Type": "application/json"
+            }
+            return _get(f"/company/{cid}/staff", params, headers=headers)
+        raise
 
 
 def get_book_dates(company_id=None):
