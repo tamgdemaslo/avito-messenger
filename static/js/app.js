@@ -754,19 +754,36 @@ function updateChatHeaderWithCustomerInfo(userName, itemTitle, userAvatar, custo
             <div class="chat-header-text">
                 <h2>${escapeHtml(userName)}</h2>
                 ${itemTitle ? `<div class="chat-subtitle">${escapeHtml(itemTitle)}</div>` : ''}
-                <div class="customer-info-inline">
-                    ${customerData.vin ? `<span class="customer-badge" title="VIN номер">🚗 ${escapeHtml(customerData.vin)}</span>` : ''}
-                    ${customerData.phone ? `<span class="customer-badge" title="Телефон">📞 ${escapeHtml(customerData.phone)}</span>` : ''}
-                    ${customerData.comments ? `<span class="customer-badge" title="Комментарии">💬 ${escapeHtml(customerData.comments.substring(0, 30))}${customerData.comments.length > 30 ? '...' : ''}</span>` : ''}
+                <!-- Инлайн редактируемые поля -->
+                <div class="customer-info-editable">
+                    <div class="customer-field">
+                        <span class="field-icon">🚗</span>
+                        <input type="text" 
+                               id="inlineVIN" 
+                               class="inline-input" 
+                               placeholder="VIN" 
+                               value="${escapeHtml(customerData.vin || '')}"
+                               onchange="saveInlineCustomerData()">
+                    </div>
+                    <div class="customer-field">
+                        <span class="field-icon">📞</span>
+                        <input type="text" 
+                               id="inlinePhone" 
+                               class="inline-input" 
+                               placeholder="Телефон" 
+                               value="${escapeHtml(customerData.phone || '')}"
+                               onchange="saveInlineCustomerData()">
+                    </div>
+                    <div class="customer-field">
+                        <span class="field-icon">💬</span>
+                        <input type="text" 
+                               id="inlineComments" 
+                               class="inline-input" 
+                               placeholder="Комментарии" 
+                               value="${escapeHtml(customerData.comments || '')}"
+                               onchange="saveInlineCustomerData()">
+                    </div>
                 </div>
-            </div>
-            <div class="chat-header-actions">
-                <button class="btn btn-icon" onclick="openCustomerInfo()" title="Редактировать информацию">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                    </svg>
-                </button>
             </div>
         </div>
     `;
@@ -1219,49 +1236,23 @@ function showError(message) {
 let currentCustomerSource = null;
 let currentCustomerSourceId = null;
 
-async function openCustomerInfo() {
+// Инлайн сохранение данных клиента
+async function saveInlineCustomerData() {
     if (!currentChatId) return;
+    
+    const vin = document.getElementById('inlineVIN')?.value.trim() || '';
+    const phone = document.getElementById('inlinePhone')?.value.trim() || '';
+    const comments = document.getElementById('inlineComments')?.value.trim() || '';
     
     const chat = chats.find(c => c.id === currentChatId);
     if (!chat) return;
     
-    // Определяем source и source_id
-    currentCustomerSource = chat.source || 'avito';
-    currentCustomerSourceId = chat.id;
-    
-    // Получаем имя пользователя
-    const userName = getChatUserName(chat);
-    
-    // Загружаем информацию о клиенте
-    try {
-        const response = await fetch(`/api/customers/${currentCustomerSource}/${encodeURIComponent(currentCustomerSourceId)}`);
-        const data = await response.json();
-        
-        // Заполняем форму
-        document.getElementById('customerName').value = userName;
-        document.getElementById('customerVIN').value = data.vin || '';
-        document.getElementById('customerPhone').value = data.phone || '';
-        document.getElementById('customerComments').value = data.comments || '';
-        
-        // Показываем модальное окно
-        document.getElementById('customerInfoModal').style.display = 'flex';
-    } catch (error) {
-        showError('Ошибка загрузки данных клиента: ' + error.message);
-    }
-}
-
-function closeCustomerModal() {
-    document.getElementById('customerInfoModal').style.display = 'none';
-}
-
-async function saveCustomerInfo() {
-    const vin = document.getElementById('customerVIN').value.trim();
-    const phone = document.getElementById('customerPhone').value.trim();
-    const comments = document.getElementById('customerComments').value.trim();
-    const name = document.getElementById('customerName').value.trim();
+    const source = chat.source || 'avito';
+    const sourceId = chat.id;
+    const name = getChatUserName(chat);
     
     try {
-        const response = await fetch(`/api/customers/${currentCustomerSource}/${encodeURIComponent(currentCustomerSourceId)}`, {
+        const response = await fetch(`/api/customers/${source}/${encodeURIComponent(sourceId)}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -1277,22 +1268,11 @@ async function saveCustomerInfo() {
         const data = await response.json();
         
         if (data.success) {
-            closeCustomerModal();
-            // Обновляем заголовок чата с новыми данными
-            renderChatHeader(window.currentChatInfo);
-            console.log('✅ Информация о клиенте сохранена');
-        } else {
-            showError('Ошибка сохранения: ' + (data.error || 'Unknown error'));
+            console.log('✅ Данные клиента сохранены');
+            // Обновляем глобальные данные
+            window.currentCustomerData = data.customer;
         }
     } catch (error) {
-        showError('Ошибка сохранения данных: ' + error.message);
+        console.error('Ошибка сохранения:', error);
     }
 }
-
-// Закрытие модального окна по клику вне его
-document.addEventListener('click', (e) => {
-    const modal = document.getElementById('customerInfoModal');
-    if (modal && e.target === modal) {
-        closeCustomerModal();
-    }
-});

@@ -951,3 +951,48 @@ textarea.form-input {
 .customer-badge:hover {
     background: #e9ecef;
 }
+
+/* Инлайн редактирование информации о клиенте */
+.customer-info-editable {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.customer-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.field-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+    width: 20px;
+}
+
+.inline-input {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 13px;
+    background: white;
+    transition: all 0.2s;
+}
+
+.inline-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(0, 160, 70, 0.1);
+}
+
+.inline-input::placeholder {
+    color: #adb5bd;
+}
+
+.inline-input:not(:placeholder-shown) {
+    background: #f8f9fa;
+    font-weight: 500;
+}
