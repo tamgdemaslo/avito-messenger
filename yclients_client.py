@@ -194,8 +194,9 @@ def get_services(company_id=None):
                 print("⚠️ YClients: Не удалось получить User Token")
                 return []
             
+            # Для /company/ endpoints нужны ОБА токена: Partner Token И User Token
             headers = {
-                "Authorization": f"Bearer {user_token}",
+                "Authorization": f"Bearer {YCLIENTS_PARTNER_TOKEN}, User {user_token}",
                 "Accept": "application/vnd.yclients.v2+json",
                 "Content-Type": "application/json"
             }
@@ -223,8 +224,9 @@ def get_staff(company_id=None, service_ids=None):
                 print("⚠️ YClients: Не удалось получить User Token")
                 return []
             
+            # Для /company/ endpoints нужны ОБА токена: Partner Token И User Token
             headers = {
-                "Authorization": f"Bearer {user_token}",
+                "Authorization": f"Bearer {YCLIENTS_PARTNER_TOKEN}, User {user_token}",
                 "Accept": "application/vnd.yclients.v2+json",
                 "Content-Type": "application/json"
             }
