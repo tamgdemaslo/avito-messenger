@@ -19,35 +19,58 @@ print(f"YClients Config: Token={'***' if YCLIENTS_PARTNER_TOKEN else 'NOT SET'},
 
 API = "https://api.yclients.com/api/v1"
 
-# YClients использует Bearer токен И User-Token
+# Стандартные заголовки с Bearer токеном
 HEADERS = {
     "Authorization": f"Bearer {YCLIENTS_PARTNER_TOKEN}",
     "Accept": "application/vnd.yclients.v2+json",
     "Content-Type": "application/json"
 }
 
+# Альтернативные заголовки для booking endpoints (без Bearer)
+BOOKING_HEADERS = {
+    "Authorization": YCLIENTS_PARTNER_TOKEN,  # Без "Bearer"
+    "Accept": "application/json",
+    "Content-Type": "application/json"
+}
+
 # Логирование конфигурации
-print(f"YClients Config: Token={'***' if YCLIENTS_PARTNER_TOKEN else 'NOT SET'} (len={len(YCLIENTS_PARTNER_TOKEN)}), Company ID={YCLIENTS_COMPANY_ID}")
+print(f"YClients Config: Token={'***' if YCLIENTS_PARTNER_TOKEN else 'NOT SET'} (len={len(YCLIENTS_PARTNER_TOKEN) if YCLIENTS_PARTNER_TOKEN else 0}), Company ID={YCLIENTS_COMPANY_ID}")
 
 
-def _get(path, params=None):
+def _get(path, params=None, headers=None):
     """Внутренний GET запрос"""
     url = API + path
+    request_headers = headers or HEADERS
     try:
         print(f"YClients GET: {url}")
-        print(f"YClients Headers: Authorization={HEADERS['Authorization'][:20]}...")
+        print(f"YClients Headers: {request_headers}")
         
-        response = requests.get(url, headers=HEADERS, params=params or {}, timeout=10)
+        response = requests.get(url, headers=request_headers, params=params or {}, timeout=10)
         print(f"YClients Response Status: {response.status_code}")
+        
+        # Логируем ответ при ошибке
+        if response.status_code != 200:
+            print(f"YClients Error Response: {response.text[:500]}")
+            try:
+                error_json = response.json()
+                print(f"YClients Error JSON: {error_json}")
+            except:
+                pass
         
         response.raise_for_status()
         result = response.json()
         
-        print(f"YClients Response Keys: {result.keys()}")
+        print(f"YClients Response Keys: {result.keys() if isinstance(result, dict) else 'Not a dict'}")
         data = result.get('data', result)  # Если нет 'data', возвращаем весь результат
         print(f"YClients Data Type: {type(data)}, Length: {len(data) if isinstance(data, (list, dict)) else 'N/A'}")
         
         return data
+    except requests.exceptions.HTTPError as e:
+        print(f"YClients HTTP Error ({url}): {e}")
+        if hasattr(e.response, 'text'):
+            print(f"YClients Error Response Text: {e.response.text[:500]}")
+        log.error(f"YClients GET error ({url}): {e}")
+        raise
     except Exception as e:
         print(f"YClients GET error ({url}): {e}")
         log.error(f"YClients GET error ({url}): {e}")
@@ -75,7 +98,15 @@ def get_services(company_id=None):
     """Получить список услуг"""
     cid = company_id or YCLIENTS_COMPANY_ID
     # Используем /book_services как в вашем старом коде
-    return _get(f"/book_services/{cid}")
+    # Пробуем сначала с обычными заголовками, потом с booking заголовками
+    try:
+        return _get(f"/book_services/{cid}")
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 401:
+            # Пробуем с альтернативными заголовками (без Bearer)
+            print("YClients: Trying alternative headers for booking endpoint (without Bearer)...")
+            return _get(f"/book_services/{cid}", headers=BOOKING_HEADERS)
+        raise
 
 
 def get_staff(company_id=None, service_ids=None):
@@ -85,7 +116,14 @@ def get_staff(company_id=None, service_ids=None):
     if service_ids:
         params["service_ids[]"] = service_ids
     # Используем /book_staff как в вашем старом коде
-    return _get(f"/book_staff/{cid}", params)
+    try:
+        return _get(f"/book_staff/{cid}", params)
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 401:
+            # Пробуем с альтернативными заголовками (без Bearer)
+            print("YClients: Trying alternative headers for booking endpoint (without Bearer)...")
+            return _get(f"/book_staff/{cid}", params, headers=BOOKING_HEADERS)
+        raise
 
 
 def get_book_dates(company_id=None):
