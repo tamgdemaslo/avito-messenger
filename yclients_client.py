@@ -97,16 +97,8 @@ def _post(path, json_data):
 def get_services(company_id=None):
     """Получить список услуг"""
     cid = company_id or YCLIENTS_COMPANY_ID
-    # Используем /book_services как в вашем старом коде
-    # Пробуем сначала с обычными заголовками, потом с booking заголовками
-    try:
-        return _get(f"/book_services/{cid}")
-    except requests.exceptions.HTTPError as e:
-        if e.response.status_code == 401:
-            # Пробуем с альтернативными заголовками (без Bearer)
-            print("YClients: Trying alternative headers for booking endpoint (without Bearer)...")
-            return _get(f"/book_services/{cid}", headers=BOOKING_HEADERS)
-        raise
+    # Правильный endpoint по документации YClients API
+    return _get(f"/company/{cid}/services")
 
 
 def get_staff(company_id=None, service_ids=None):
@@ -115,15 +107,8 @@ def get_staff(company_id=None, service_ids=None):
     params = {}
     if service_ids:
         params["service_ids[]"] = service_ids
-    # Используем /book_staff как в вашем старом коде
-    try:
-        return _get(f"/book_staff/{cid}", params)
-    except requests.exceptions.HTTPError as e:
-        if e.response.status_code == 401:
-            # Пробуем с альтернативными заголовками (без Bearer)
-            print("YClients: Trying alternative headers for booking endpoint (without Bearer)...")
-            return _get(f"/book_staff/{cid}", params, headers=BOOKING_HEADERS)
-        raise
+    # Правильный endpoint по документации YClients API
+    return _get(f"/company/{cid}/staff", params)
 
 
 def get_book_dates(company_id=None):
