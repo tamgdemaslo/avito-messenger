@@ -1335,7 +1335,17 @@ async function loadServices() {
             return;
         }
         
-        services.forEach(service => {
+        // Фильтруем только активные услуги
+        const activeServices = services.filter(service => service.active === 1);
+        console.log(`📊 YClients: Всего услуг: ${services.length}, Активных: ${activeServices.length}`);
+        
+        if (activeServices.length === 0) {
+            select.innerHTML = '<option value="">❌ Нет активных услуг</option>';
+            console.warn('No active services found');
+            return;
+        }
+        
+        activeServices.forEach(service => {
             const option = document.createElement('option');
             option.value = service.id;
             const price = service.price_min || service.price || 0;
@@ -1343,7 +1353,7 @@ async function loadServices() {
             select.appendChild(option);
         });
         
-        console.log(`✅ Loaded ${services.length} services`);
+        console.log(`✅ Loaded ${activeServices.length} active services`);
     } catch (error) {
         console.error('Ошибка загрузки услуг:', error);
         select.innerHTML = '<option value="">❌ Ошибка загрузки</option>';
