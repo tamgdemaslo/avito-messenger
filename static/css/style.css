@@ -996,3 +996,10 @@ textarea.form-input {
     background: #f8f9fa;
     font-weight: 500;
 }
+
+/* Маленькая кнопка для записи */
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 13px;
+    width: 100%;
+}

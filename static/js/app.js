@@ -783,6 +783,11 @@ function updateChatHeaderWithCustomerInfo(userName, itemTitle, userAvatar, custo
                                value="${escapeHtml(customerData.comments || '')}"
                                onchange="saveInlineCustomerData()">
                     </div>
+                    <div class="customer-field">
+                        <button class="btn btn-primary btn-sm" onclick="openYClientsBooking()" style="margin-top: 8px;">
+                            📅 Записать в YClients
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1274,5 +1279,174 @@ async function saveInlineCustomerData() {
         }
     } catch (error) {
         console.error('Ошибка сохранения:', error);
+    }
+}
+
+// === Запись клиента в YClients ===
+
+async function openYClientsBooking() {
+    const chat = chats.find(c => c.id === currentChatId);
+    if (!chat) return;
+    
+    const userName = getChatUserName(chat);
+    const phone = document.getElementById('inlinePhone')?.value || '';
+    
+    // Заполняем форму
+    document.getElementById('bookingClientName').value = userName;
+    document.getElementById('bookingPhone').value = phone;
+    document.getElementById('bookingComment').value = document.getElementById('inlineComments')?.value || '';
+    
+    // Показываем модальное окно
+    document.getElementById('yclientsModal').style.display = 'flex';
+    
+    // Загружаем услуги
+    await loadServices();
+}
+
+function closeYClientsModal() {
+    document.getElementById('yclientsModal').style.display = 'none';
+}
+
+async function loadServices() {
+    try {
+        const response = await fetch('/api/yclients/services');
+        const services = await response.json();
+        
+        const select = document.getElementById('bookingService');
+        select.innerHTML = '<option value="">Выберите услугу...</option>';
+        
+        if (Array.isArray(services)) {
+            services.forEach(service => {
+                const option = document.createElement('option');
+                option.value = service.id;
+                option.textContent = `${service.title} - ${service.price_min} ₽`;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки услуг:', error);
+    }
+}
+
+async function loadStaff() {
+    const serviceId = document.getElementById('bookingService').value;
+    if (!serviceId) return;
+    
+    try {
+        const response = await fetch(`/api/yclients/staff?service_ids=${serviceId}`);
+        const staff = await response.json();
+        
+        const select = document.getElementById('bookingStaff');
+        select.innerHTML = '<option value="">Выберите мастера...</option>';
+        
+        if (Array.isArray(staff)) {
+            staff.forEach(person => {
+                const option = document.createElement('option');
+                option.value = person.id;
+                option.textContent = person.name;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки мастеров:', error);
+    }
+}
+
+async function loadDates() {
+    try {
+        const response = await fetch('/api/yclients/dates');
+        const data = await response.json();
+        
+        const select = document.getElementById('bookingDate');
+        select.innerHTML = '<option value="">Выберите дату...</option>';
+        
+        const dates = data.booking_dates || [];
+        dates.forEach(dateStr => {
+            const option = document.createElement('option');
+            option.value = dateStr;
+            const d = new Date(dateStr);
+            option.textContent = d.toLocaleDateString('ru-RU', { 
+                day: 'numeric', 
+                month: 'long', 
+                weekday: 'short' 
+            });
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Ошибка загрузки дат:', error);
+    }
+}
+
+async function loadSlots() {
+    const staffId = document.getElementById('bookingStaff').value;
+    const serviceId = document.getElementById('bookingService').value;
+    const dateIso = document.getElementById('bookingDate').value;
+    
+    if (!staffId || !serviceId || !dateIso) return;
+    
+    try {
+        const response = await fetch(`/api/yclients/slots?staff_id=${staffId}&service_id=${serviceId}&date=${dateIso}`);
+        const slots = await response.json();
+        
+        const select = document.getElementById('bookingTime');
+        select.innerHTML = '<option value="">Выберите время...</option>';
+        
+        if (Array.isArray(slots)) {
+            slots.forEach(slot => {
+                const option = document.createElement('option');
+                option.value = slot.datetime;
+                option.textContent = slot.time;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки слотов:', error);
+    }
+}
+
+async function confirmYClientsBooking() {
+    const phone = document.getElementById('bookingPhone').value.trim();
+    const fullname = document.getElementById('bookingClientName').value.trim();
+    const serviceId = document.getElementById('bookingService').value;
+    const staffId = document.getElementById('bookingStaff').value;
+    const datetime = document.getElementById('bookingTime').value;
+    const comment = document.getElementById('bookingComment').value.trim();
+    
+    if (!phone || !fullname || !serviceId || !staffId || !datetime) {
+        showError('Заполните все обязательные поля');
+        return;
+    }
+    
+    const appointments = [{
+        id: parseInt(serviceId),
+        staff_id: parseInt(staffId),
+        datetime: datetime
+    }];
+    
+    try {
+        showLoading();
+        const response = await fetch('/api/yclients/book', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                phone: phone,
+                fullname: fullname,
+                appointments: appointments,
+                comment: comment
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            closeYClientsModal();
+            alert('✅ Клиент успешно записан в YClients!');
+        } else {
+            showError('Ошибка записи: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        showError('Ошибка записи: ' + error.message);
+    } finally {
+        hideLoading();
     }
 }

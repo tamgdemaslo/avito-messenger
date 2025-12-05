@@ -152,6 +152,58 @@
         <div class="spinner"></div>
     </div>
 
+    <!-- YClients Booking Modal -->
+    <div class="modal" id="yclientsModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📅 Запись в YClients</h2>
+                <button class="modal-close" onclick="closeYClientsModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Клиент</label>
+                    <input type="text" id="bookingClientName" class="form-input" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Телефон</label>
+                    <input type="text" id="bookingPhone" class="form-input" placeholder="+79991234567">
+                </div>
+                <div class="form-group">
+                    <label>Услуга</label>
+                    <select id="bookingService" class="form-input" onchange="loadStaff()">
+                        <option value="">Выберите услугу...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Мастер</label>
+                    <select id="bookingStaff" class="form-input" onchange="loadDates()">
+                        <option value="">Выберите мастера...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Дата</label>
+                    <select id="bookingDate" class="form-input" onchange="loadSlots()">
+                        <option value="">Выберите дату...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Время</label>
+                    <select id="bookingTime" class="form-input">
+                        <option value="">Выберите время...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Комментарий</label>
+                    <textarea id="bookingComment" class="form-input" rows="3" placeholder="Комментарий к записи..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeYClientsModal()">Отмена</button>
+                <button class="btn btn-primary" onclick="confirmYClientsBooking()">Записать</button>
+            </div>
+        </div>
+    </div>
+
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>

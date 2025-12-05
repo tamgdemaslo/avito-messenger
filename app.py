@@ -14,6 +14,7 @@ import json
 import telegram_client
 import whatsapp_client
 import database
+import yclients_client
 
 # Получаем абсолютный путь к директории проекта
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -863,6 +864,99 @@ def search_customers():
         
         results = database.search_customers(query)
         return jsonify(results)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# === API для работы с YClients ===
+
+@app.route('/api/yclients/status', methods=['GET'])
+def yclients_status():
+    """Проверить настроен ли YClients"""
+    try:
+        configured = yclients_client.is_yclients_configured()
+        return jsonify({
+            "configured": configured,
+            "company_id": yclients_client.YCLIENTS_COMPANY_ID if configured else None
+        })
+    except Exception as e:
+        return jsonify({"configured": False, "error": str(e)})
+
+
+@app.route('/api/yclients/services', methods=['GET'])
+def get_yclients_services():
+    """Получить список услуг YClients"""
+    try:
+        services = yclients_client.get_services()
+        return jsonify(services)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/yclients/staff', methods=['GET'])
+def get_yclients_staff():
+    """Получить список мастеров"""
+    try:
+        service_ids = request.args.get('service_ids')
+        staff = yclients_client.get_staff(service_ids=[int(service_ids)] if service_ids else None)
+        return jsonify(staff)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/yclients/dates', methods=['GET'])
+def get_yclients_dates():
+    """Получить доступные даты"""
+    try:
+        dates = yclients_client.get_book_dates()
+        return jsonify(dates)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/yclients/slots', methods=['GET'])
+def get_yclients_slots():
+    """Получить свободные слоты"""
+    try:
+        staff_id = request.args.get('staff_id')
+        service_id = request.args.get('service_id')
+        date_iso = request.args.get('date')
+        
+        if not all([staff_id, service_id, date_iso]):
+            return jsonify({"error": "Missing required parameters"}), 400
+        
+        slots = yclients_client.get_free_slots(
+            int(staff_id),
+            int(service_id),
+            date_iso
+        )
+        return jsonify(slots)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/yclients/book', methods=['POST'])
+def create_yclients_booking():
+    """Создать запись клиента в YClients"""
+    try:
+        data = request.json
+        
+        phone = data.get('phone')
+        fullname = data.get('fullname')
+        appointments = data.get('appointments')
+        comment = data.get('comment')
+        
+        if not all([phone, fullname, appointments]):
+            return jsonify({"error": "Missing required fields"}), 400
+        
+        result = yclients_client.create_booking(
+            phone=phone,
+            fullname=fullname,
+            appointments=appointments,
+            comment=comment
+        )
+        
+        return jsonify({"success": True, "data": result})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
