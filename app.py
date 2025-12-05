@@ -932,9 +932,9 @@ def get_yclients_slots():
             return jsonify({"error": "Missing required parameters"}), 400
         
         slots = yclients_client.get_free_slots(
-            int(staff_id),
-            int(service_id),
-            date_iso
+            staff_id=int(staff_id),
+            date_iso=date_iso,
+            service_ids=[int(service_id)]
         )
         return jsonify(slots)
     except Exception as e:
