@@ -542,13 +542,7 @@ async function loadMessages(chatId, silent = false) {
     // Генерируем уникальный ID для этого запроса
     const requestId = ++loadRequestId;
     
-    // Отменяем предыдущий fetch
-    if (currentLoadController) {
-        currentLoadController.abort();
-    }
-    currentLoadController = new AbortController();
-    
-    console.log(`🔄 Loading chat ${chatId}, requestId: ${requestId}`);
+    console.log(`🔄 Loading chat ${chatId}, requestId: ${requestId}, silent: ${silent}`);
     
     // Проверяем кэш
     const hasCache = messagesCache[chatId];
@@ -574,8 +568,8 @@ async function loadMessages(chatId, silent = false) {
         
         console.log(`⚡ Loaded from cache ${chatId} (age: ${Math.round(cacheAge/1000)}s)`);
         
-        // Если кэш свежий (< 30 сек) И это не тихое обновление - НЕ делаем запрос!
-        if (isCacheFresh && !silent) {
+        // Если кэш свежий (< 30 сек) - НЕ делаем запрос вообще!
+        if (isCacheFresh) {
             console.log(`✅ Cache is fresh, skipping API request`);
             return;
         }
@@ -583,6 +577,12 @@ async function loadMessages(chatId, silent = false) {
         // Показываем скелетон только если нет кэша
         showMessagesSkeleton();
     }
+    
+    // Отменяем предыдущий fetch
+    if (currentLoadController) {
+        currentLoadController.abort();
+    }
+    currentLoadController = new AbortController();
     
     // Загружаем данные
     try {

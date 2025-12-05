@@ -123,14 +123,15 @@ async def get_telegram_chats_async(limit=100):
         try:
             entity = dialog.entity
             
-            # ФИЛЬТР: Загружаем ТОЛЬКО личные диалоги с пользователями
-            # Пропускаем группы (Chat) и каналы (Channel)
-            if not isinstance(entity, User):
+            # ФИЛЬТР: Пропускаем только группы и каналы
+            # Загружаем личные чаты (User) и приватные диалоги
+            if isinstance(entity, Chat) or isinstance(entity, Channel):
+                # Пропускаем группы и каналы
                 continue
             
-            # Пропускаем ботов (опционально)
-            # if hasattr(entity, 'bot') and entity.bot:
-            #     continue
+            # Пропускаем служебные чаты (Telegram Service)
+            if dialog.id == 777000:
+                continue
             
             # Получаем информацию о чате
             chat_data = {
