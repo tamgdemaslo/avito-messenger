@@ -14,8 +14,18 @@ log = logging.getLogger(__name__)
 YCLIENTS_PARTNER_TOKEN = os.environ.get('YCLIENTS_PARTNER_TOKEN', '')
 YCLIENTS_COMPANY_ID = int(os.environ.get('YCLIENTS_COMPANY_ID', '0'))
 
-# Логирование конфигурации
-print(f"YClients Config: Token={'***' if YCLIENTS_PARTNER_TOKEN else 'NOT SET'}, Company ID={YCLIENTS_COMPANY_ID}")
+# Детальная проверка конфигурации
+if not YCLIENTS_PARTNER_TOKEN:
+    print("⚠️ YClients: YCLIENTS_PARTNER_TOKEN НЕ УСТАНОВЛЕН!")
+elif len(YCLIENTS_PARTNER_TOKEN) < 10:
+    print(f"⚠️ YClients: YCLIENTS_PARTNER_TOKEN слишком короткий: {len(YCLIENTS_PARTNER_TOKEN)} символов")
+else:
+    print(f"✅ YClients: Token установлен ({len(YCLIENTS_PARTNER_TOKEN)} символов: {YCLIENTS_PARTNER_TOKEN[:5]}...{YCLIENTS_PARTNER_TOKEN[-3:]})")
+
+if YCLIENTS_COMPANY_ID == 0:
+    print("⚠️ YClients: YCLIENTS_COMPANY_ID НЕ УСТАНОВЛЕН!")
+else:
+    print(f"✅ YClients: Company ID = {YCLIENTS_COMPANY_ID}")
 
 API = "https://api.yclients.com/api/v1"
 
@@ -97,8 +107,8 @@ def _post(path, json_data):
 def get_services(company_id=None):
     """Получить список услуг"""
     cid = company_id or YCLIENTS_COMPANY_ID
-    # Правильный endpoint по документации YClients API
-    return _get(f"/company/{cid}/services")
+    # Используем booking endpoint (работает с Partner Token)
+    return _get(f"/book_services/{cid}")
 
 
 def get_staff(company_id=None, service_ids=None):
@@ -107,8 +117,8 @@ def get_staff(company_id=None, service_ids=None):
     params = {}
     if service_ids:
         params["service_ids[]"] = service_ids
-    # Правильный endpoint по документации YClients API
-    return _get(f"/company/{cid}/staff", params)
+    # Используем booking endpoint (работает с Partner Token)
+    return _get(f"/book_staff/{cid}", params)
 
 
 def get_book_dates(company_id=None):
