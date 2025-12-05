@@ -69,7 +69,8 @@ def _post(path, json_data):
 def get_services(company_id=None):
     """Получить список услуг"""
     cid = company_id or YCLIENTS_COMPANY_ID
-    return _get(f"/book_services/{cid}")
+    # Правильный endpoint: /company/{company_id}/services
+    return _get(f"/company/{cid}/services")
 
 
 def get_staff(company_id=None, service_ids=None):
@@ -78,7 +79,8 @@ def get_staff(company_id=None, service_ids=None):
     params = {}
     if service_ids:
         params["service_ids[]"] = service_ids
-    return _get(f"/book_staff/{cid}", params)
+    # Правильный endpoint: /company/{company_id}/staff
+    return _get(f"/company/{cid}/staff", params)
 
 
 def get_book_dates(company_id=None):
