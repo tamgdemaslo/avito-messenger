@@ -16,6 +16,7 @@ YCLIENTS_COMPANY_ID = int(os.environ.get('YCLIENTS_COMPANY_ID', '0'))
 YCLIENTS_LOGIN = os.environ.get('YCLIENTS_LOGIN', '')  # Email или телефон
 YCLIENTS_PASSWORD = os.environ.get('YCLIENTS_PASSWORD', '')  # Пароль
 YCLIENTS_USER_TOKEN = None  # Будет получен при первом запросе
+YCLIENTS_COMPANIES_CACHE = None  # Кеш списка компаний
 
 # Детальная проверка конфигурации
 if not YCLIENTS_PARTNER_TOKEN:
@@ -177,6 +178,43 @@ def _post(path, json_data):
 # API Функции
 # ═══════════════════════════════════════════════════════════
 
+def get_user_companies():
+    """Получить список компаний/филиалов пользователя (с кешированием)"""
+    global YCLIENTS_COMPANIES_CACHE
+    
+    # Проверяем кеш
+    if YCLIENTS_COMPANIES_CACHE:
+        return YCLIENTS_COMPANIES_CACHE
+    
+    user_token = get_user_token()
+    if not user_token:
+        print("⚠️ YClients: Не удалось получить User Token")
+        return []
+    
+    try:
+        headers = {
+            "Authorization": f"Bearer {YCLIENTS_PARTNER_TOKEN}, User {user_token}",
+            "Accept": "application/vnd.yclients.v2+json",
+            "Content-Type": "application/json"
+        }
+        
+        print("YClients: Получаем список доступных компаний/филиалов")
+        companies = _get("/companies", headers=headers)
+        
+        if companies:
+            print(f"✅ YClients: Найдено {len(companies)} компаний/филиалов:")
+            for company in companies[:5]:  # Показываем первые 5
+                print(f"  - ID: {company.get('id')}, Название: {company.get('title', 'N/A')}")
+            
+            # Кешируем результат
+            YCLIENTS_COMPANIES_CACHE = companies
+        
+        return companies
+    except Exception as e:
+        print(f"❌ YClients: Ошибка получения списка компаний: {e}")
+        return []
+
+
 def get_services(company_id=None):
     """Получить список услуг доступных для бронирования"""
     cid = company_id or YCLIENTS_COMPANY_ID
@@ -187,8 +225,18 @@ def get_services(company_id=None):
         return _get(f"/book_services/{cid}")
     except requests.exceptions.HTTPError as e:
         if e.response.status_code == 404:
-            # Если booking endpoint недоступен (форма записи не настроена), используем User Token
-            print(f"YClients: /book_services/ недоступен (404), пробуем через /company/services/ (User Token)")
+            # Если booking endpoint недоступен, получаем список компаний и пробуем первую доступную
+            print(f"YClients: /book_services/{cid} недоступен (404)")
+            
+            companies = get_user_companies()
+            if not companies:
+                print("⚠️ YClients: Не удалось получить список компаний")
+                return []
+            
+            # Берём первую компанию из списка
+            first_company_id = companies[0].get('id')
+            print(f"YClients: Используем первую доступную компанию ID={first_company_id}")
+            
             user_token = get_user_token()
             if not user_token:
                 print("⚠️ YClients: Не удалось получить User Token")
@@ -200,7 +248,7 @@ def get_services(company_id=None):
                 "Accept": "application/vnd.yclients.v2+json",
                 "Content-Type": "application/json"
             }
-            return _get(f"/company/{cid}/services", headers=headers)
+            return _get(f"/company/{first_company_id}/services", headers=headers)
         raise
 
 
@@ -217,8 +265,18 @@ def get_staff(company_id=None, service_ids=None):
         return _get(f"/book_staff/{cid}", params)
     except requests.exceptions.HTTPError as e:
         if e.response.status_code == 404:
-            # Если booking endpoint недоступен, используем User Token
-            print(f"YClients: /book_staff/ недоступен (404), пробуем через /company/staff/ (User Token)")
+            # Если booking endpoint недоступен, получаем список компаний
+            print(f"YClients: /book_staff/{cid} недоступен (404)")
+            
+            companies = get_user_companies()
+            if not companies:
+                print("⚠️ YClients: Не удалось получить список компаний")
+                return []
+            
+            # Берём первую компанию из списка
+            first_company_id = companies[0].get('id')
+            print(f"YClients: Используем первую доступную компанию ID={first_company_id}")
+            
             user_token = get_user_token()
             if not user_token:
                 print("⚠️ YClients: Не удалось получить User Token")
@@ -230,7 +288,7 @@ def get_staff(company_id=None, service_ids=None):
                 "Accept": "application/vnd.yclients.v2+json",
                 "Content-Type": "application/json"
             }
-            return _get(f"/company/{cid}/staff", params, headers=headers)
+            return _get(f"/company/{first_company_id}/staff", params, headers=headers)
         raise
 
 
