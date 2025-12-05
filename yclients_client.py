@@ -29,7 +29,7 @@ else:
 if YCLIENTS_COMPANY_ID == 0:
     print("⚠️ YClients: YCLIENTS_COMPANY_ID НЕ УСТАНОВЛЕН!")
 else:
-    print(f"✅ YClients: Company ID = {YCLIENTS_COMPANY_ID}")
+    print(f"✅ YClients: Company ID = {YCLIENTS_COMPANY_ID} (будет автоматически определён при необходимости)")
 
 API = "https://api.yclients.com/api/v1"
 
