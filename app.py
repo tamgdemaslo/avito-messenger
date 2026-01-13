@@ -945,7 +945,15 @@ def get_yclients_slots():
 def create_yclients_booking():
     """Создать запись клиента в YClients"""
     try:
+        # Проверяем конфигурацию YClients
+        if not yclients_client.is_yclients_configured():
+            return jsonify({
+                "error": "YClients не настроен. Добавьте YCLIENTS_PARTNER_TOKEN и YCLIENTS_COMPANY_ID в переменные окружения"
+            }), 400
+        
         data = request.json
+        if not data:
+            return jsonify({"error": "Request body is required"}), 400
         
         phone = data.get('phone')
         fullname = data.get('fullname')
@@ -953,7 +961,14 @@ def create_yclients_booking():
         comment = data.get('comment')
         
         if not all([phone, fullname, appointments]):
-            return jsonify({"error": "Missing required fields"}), 400
+            return jsonify({
+                "error": "Missing required fields",
+                "details": {
+                    "phone": bool(phone),
+                    "fullname": bool(fullname),
+                    "appointments": bool(appointments)
+                }
+            }), 400
         
         result = yclients_client.create_booking(
             phone=phone,
@@ -963,8 +978,100 @@ def create_yclients_booking():
         )
         
         return jsonify({"success": True, "data": result})
+    except requests.exceptions.HTTPError as e:
+        error_msg = str(e)
+        error_detail = None
+        
+        # Извлекаем детальное сообщение об ошибке из исключения
+        if hasattr(e, 'error_detail'):
+            error_detail = e.error_detail
+            error_msg = error_detail
+        
+        # Если не нашли детали, пробуем извлечь из response
+        if not error_detail:
+            try:
+                if hasattr(e, 'response') and e.response:
+                    error_data = e.response.json()
+                    if isinstance(error_data, dict):
+                        # Пытаемся найти сообщение об ошибке в разных полях
+                        if 'meta' in error_data and isinstance(error_data['meta'], dict):
+                            error_msg = error_data['meta'].get('error', error_data['meta'].get('message', error_msg))
+                        elif 'error' in error_data:
+                            if isinstance(error_data['error'], list):
+                                error_msg = "; ".join(str(x) for x in error_data['error'])
+                            else:
+                                error_msg = error_data['error']
+                        elif 'message' in error_data:
+                            error_msg = error_data['message']
+                        elif 'errors' in error_data:
+                            # Ошибки валидации
+                            errors_dict = error_data['errors']
+                            if isinstance(errors_dict, dict):
+                                error_parts = []
+                                for field, messages in errors_dict.items():
+                                    if isinstance(messages, list):
+                                        error_parts.append(f"{field}: {', '.join(str(m) for m in messages)}")
+                                    elif isinstance(messages, dict):
+                                        error_parts.append(f"{field}: {', '.join(str(v) for v in messages.values())}")
+                                    else:
+                                        error_parts.append(f"{field}: {messages}")
+                                error_msg = "; ".join(error_parts) if error_parts else error_msg
+                            else:
+                                error_msg = str(errors_dict)
+            except Exception as parse_err:
+                print(f"⚠️ Could not parse error in app.py: {parse_err}")
+        
+        print(f"YClients HTTP error: {error_msg}")
+        status_code = 500
+        if hasattr(e, 'response') and e.response:
+            status_code = e.response.status_code
+        
+        # Формируем детальный ответ
+        error_response = {
+            "error": f"YClients API error: {error_msg}",
+            "status_code": status_code
+        }
+        
+        # Добавляем полные детали ошибки для отладки
+        if hasattr(e, 'error_data') and e.error_data:
+            error_response["details"] = e.error_data
+        elif hasattr(e, 'error_full') and e.error_full:
+            try:
+                # Пытаемся распарсить как JSON
+                if isinstance(e.error_full, str):
+                    error_response["details"] = json.loads(e.error_full)
+                else:
+                    error_response["details"] = e.error_full
+            except:
+                error_response["details"] = {"raw": str(e.error_full)}
+        
+        # Для 422 ошибок добавляем подсказку
+        if status_code == 422:
+            error_response["hint"] = "Ошибка валидации данных. Проверьте правильность заполнения всех полей."
+        
+        return jsonify(error_response), status_code
+    except ValueError as e:
+        print(f"YClients validation error: {e}")
+        return jsonify({"error": f"Validation error: {str(e)}"}), 400
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"YClients booking error: {e}\n{error_trace}")
+        
+        # Проверяем, это ошибка валидации данных?
+        error_msg = str(e)
+        if "ValueError" in str(type(e).__name__) or "validation" in error_msg.lower():
+            return jsonify({
+                "error": f"Ошибка валидации данных: {error_msg}",
+                "type": type(e).__name__,
+                "details": "Проверьте формат данных: телефон, имя, услуга, мастер, дата и время должны быть заполнены корректно"
+            }), 400
+        
+        return jsonify({
+            "error": f"Внутренняя ошибка: {error_msg}",
+            "type": type(e).__name__,
+            "traceback": error_trace if app.debug else None
+        }), 500
 
 
 if __name__ == '__main__':

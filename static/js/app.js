@@ -1449,11 +1449,20 @@ async function confirmYClientsBooking() {
         return;
     }
     
+    // Формируем appointments в правильном формате для YClients API
+    // YClients ожидает: services (массив), staff_id, datetime (ISO 8601)
     const appointments = [{
-        id: parseInt(serviceId),
+        services: [parseInt(serviceId)],  // Массив ID услуг
         staff_id: parseInt(staffId),
-        datetime: datetime
+        datetime: datetime  // Должен быть в формате ISO 8601 (например: "2024-12-15T14:00:00")
     }];
+    
+    console.log('📅 Отправка записи:', {
+        phone,
+        fullname,
+        appointments,
+        comment
+    });
     
     try {
         showLoading();
@@ -1470,6 +1479,79 @@ async function confirmYClientsBooking() {
         
         const data = await response.json();
         
+        if (!response.ok) {
+            // Обрабатываем ошибки от сервера (4xx, 5xx)
+            let errorMsg = data.error || data.message || `HTTP ${response.status}: ${response.statusText}`;
+            
+            // Логируем полный ответ для отладки
+            console.error('📋 Full booking error response:', data);
+            
+            // Если есть детали ошибки, добавляем их к сообщению
+            if (data.details) {
+                const detailsParts = [];
+                
+                if (typeof data.details === 'object') {
+                    // Пытаемся извлечь сообщения из разных форматов
+                    
+                    // Формат 1: errors - словарь с полями валидации
+                    if (data.details.errors) {
+                        for (const [field, messages] of Object.entries(data.details.errors)) {
+                            if (Array.isArray(messages)) {
+                                detailsParts.push(`${field}: ${messages.join(', ')}`);
+                            } else if (typeof messages === 'object') {
+                                // Если messages - объект, извлекаем значения
+                                detailsParts.push(`${field}: ${Object.values(messages).join(', ')}`);
+                            } else {
+                                detailsParts.push(`${field}: ${messages}`);
+                            }
+                        }
+                    }
+                    
+                    // Формат 2: error - массив или строка
+                    if (data.details.error) {
+                        if (Array.isArray(data.details.error)) {
+                            detailsParts.push(...data.details.error.map(e => String(e)));
+                        } else {
+                            detailsParts.push(String(data.details.error));
+                        }
+                    }
+                    
+                    // Формат 3: message
+                    if (data.details.message) {
+                        detailsParts.push(String(data.details.message));
+                    }
+                    
+                    // Формат 4: meta.error или meta.message
+                    if (data.details.meta) {
+                        const meta = data.details.meta;
+                        if (meta.error) detailsParts.push(`Meta: ${meta.error}`);
+                        if (meta.message) detailsParts.push(`Meta: ${meta.message}`);
+                    }
+                    
+                    // Если ничего не нашли, показываем весь объект
+                    if (detailsParts.length === 0) {
+                        detailsParts.push(JSON.stringify(data.details, null, 2));
+                    }
+                } else {
+                    // Если details - не объект, просто добавляем как строку
+                    detailsParts.push(String(data.details));
+                }
+                
+                if (detailsParts.length > 0) {
+                    errorMsg += '\n\n🔍 Детали ошибки:\n' + detailsParts.join('\n');
+                }
+            }
+            
+            // Добавляем подсказку для 422 ошибок
+            if (data.status_code === 422) {
+                errorMsg += '\n\n💡 Проверьте правильность заполнения всех полей: телефон, имя, услуга, мастер, дата и время.';
+            }
+            
+            console.error('Booking error:', errorMsg, data);
+            showError('Ошибка записи:\n' + errorMsg);
+            return;
+        }
+        
         if (data.success) {
             closeYClientsModal();
             alert('✅ Клиент успешно записан в YClients!');
@@ -1477,7 +1559,8 @@ async function confirmYClientsBooking() {
             showError('Ошибка записи: ' + (data.error || 'Unknown error'));
         }
     } catch (error) {
-        showError('Ошибка записи: ' + error.message);
+        console.error('Booking exception:', error);
+        showError('Ошибка записи: ' + (error.message || 'Неизвестная ошибка'));
     } finally {
         hideLoading();
     }

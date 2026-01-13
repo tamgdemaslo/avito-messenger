@@ -31,13 +31,16 @@
 В сервисе **"web"** (Flask) добавьте переменные окружения:
 
 ```
-YCLIENTS_PARTNER_TOKEN=ваш_токен_здесь
-YCLIENTS_COMPANY_ID=123456
+YCLIENTS_PARTNER_TOKEN=mz5bf2yp97nbs4s45e9j
+YCLIENTS_COMPANY_ID=902665
 ```
 
-### Где взять:
-- **Partner Token:** YClients → Настройки → API
-- **Company ID:** из URL YClients
+### Как добавить:
+1. Railway Dashboard → ваш проект → **Variables**
+2. Нажмите **New Variable** для каждой переменной
+3. После добавления Railway автоматически перезапустит приложение
+
+Подробная инструкция: см. файл `НАСТРОЙКА_YCLIENTS.md`
 
 ---
 
