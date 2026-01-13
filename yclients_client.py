@@ -287,6 +287,9 @@ def create_booking(phone, fullname, appointments, email="", comment=None, compan
         
         normalized_apt['datetime'] = datetime_value
         
+        # YClients API требует id в каждом appointment (обычно 1 для первой записи)
+        normalized_apt['id'] = idx + 1
+        
         normalized_appointments.append(normalized_apt)
     
     payload = {
