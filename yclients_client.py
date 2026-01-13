@@ -63,6 +63,10 @@ def _post(path, json_data):
     try:
         response = requests.post(url, headers=HEADERS, json=json_data, timeout=10)
         
+        # ВСЕГДА логируем ответ для отладки (даже успешный, но особенно ошибки)
+        print(f"📥 YClients response status: {response.status_code}")
+        print(f"📥 YClients response headers: {dict(response.headers)}")
+        
         # Пытаемся получить детали ошибки из ответа
         if not response.ok:
             error_detail = f"Status {response.status_code}"
@@ -76,7 +80,8 @@ def _post(path, json_data):
                 error_full = json.dumps(error_json, indent=2, ensure_ascii=False)
                 
                 print(f"❌ YClients error response ({response.status_code}):")
-                print(f"❌ Full response: {error_full}")
+                print(f"❌ Full JSON response: {error_full}")
+                print(f"❌ Response text (first 1000 chars): {response.text[:1000] if response.text else 'Empty'}")
                 
                 # Пытаемся извлечь детальное сообщение об ошибке - пробуем разные форматы ответов YClients
                 if isinstance(error_json, dict):

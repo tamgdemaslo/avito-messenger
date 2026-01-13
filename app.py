@@ -34,7 +34,18 @@ def after_request(response):
     response.headers.add('Access-Control-Allow-Origin', '*')
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
     return response
+
+# Обработка OPTIONS запросов для CORS
+@app.before_request
+def handle_preflight():
+    if request.method == "OPTIONS":
+        response = jsonify({})
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add('Access-Control-Allow-Headers', "Content-Type,Authorization")
+        response.headers.add('Access-Control-Allow-Methods', "GET,PUT,POST,DELETE,OPTIONS")
+        return response
 
 # Конфигурация Avito API - используем персональную авторизацию
 AVITO_CLIENT_ID = os.environ.get('AVITO_CLIENT_ID', "1cIpj04gx6i3v7Ym5wNj")
@@ -142,70 +153,83 @@ def get_profile():
     return jsonify(profile if profile else {})
 
 
-@app.route('/api/chats', methods=['GET'])
+@app.route('/api/chats', methods=['GET', 'OPTIONS'])
 def get_chats():
     """Получить объединенный список чатов из Avito и Telegram"""
-    all_chats = []
-    current_user_id = None
-    
-    # === AVITO ЧАТЫ ===
-    profile, error = make_avito_request("GET", "/core/v1/accounts/self")
-    if not error and profile:
-        user_id = profile.get('id')
-        current_user_id = user_id
+    try:
+        all_chats = []
+        current_user_id = None
         
-        if user_id:
-            print(f"Got Avito user_id: {user_id}")
-            chats_data, chats_error = make_avito_request("GET", f"/messenger/v2/accounts/{user_id}/chats")
-            
-            if not chats_error and chats_data and isinstance(chats_data, dict) and 'chats' in chats_data:
-                avito_chats = chats_data['chats']
-                # Помечаем как Avito
-                for chat in avito_chats:
-                    chat['source'] = 'avito'
-                    chat['source_icon'] = 'avito'
-                all_chats.extend(avito_chats)
-                print(f"Loaded {len(avito_chats)} Avito chats")
-            elif chats_error:
-                print(f"⚠️ Avito error (может требоваться подписка): {chats_error}")
-    
-    # === TELEGRAM ЧАТЫ ===
-    try:
-        telegram_chats = telegram_client.get_telegram_chats(limit=100)
-        if telegram_chats:
-            print(f"Loaded {len(telegram_chats)} Telegram chats")
-            all_chats.extend(telegram_chats)
+        # === AVITO ЧАТЫ ===
+        try:
+            profile, error = make_avito_request("GET", "/core/v1/accounts/self")
+            if not error and profile:
+                user_id = profile.get('id')
+                current_user_id = user_id
+                
+                if user_id:
+                    print(f"Got Avito user_id: {user_id}")
+                    chats_data, chats_error = make_avito_request("GET", f"/messenger/v2/accounts/{user_id}/chats")
+                    
+                    if not chats_error and chats_data and isinstance(chats_data, dict) and 'chats' in chats_data:
+                        avito_chats = chats_data['chats']
+                        # Помечаем как Avito
+                        for chat in avito_chats:
+                            chat['source'] = 'avito'
+                            chat['source_icon'] = 'avito'
+                        all_chats.extend(avito_chats)
+                        print(f"Loaded {len(avito_chats)} Avito chats")
+                    elif chats_error:
+                        print(f"⚠️ Avito error (может требоваться подписка): {chats_error}")
+        except Exception as e:
+            print(f"⚠️ Avito chats error (skipping): {e}")
+        
+        # === TELEGRAM ЧАТЫ ===
+        try:
+            telegram_chats = telegram_client.get_telegram_chats(limit=100)
+            if telegram_chats:
+                print(f"Loaded {len(telegram_chats)} Telegram chats")
+                all_chats.extend(telegram_chats)
+        except Exception as e:
+            print(f"Telegram chats error (skipping): {e}")
+        
+        # === WHATSAPP ЧАТЫ ===
+        try:
+            # Сначала проверяем статус
+            status = whatsapp_client.get_whatsapp_status()
+            if status.get('ready'):
+                whatsapp_chats = whatsapp_client.get_whatsapp_chats(limit=30)
+                if whatsapp_chats:
+                    print(f"Loaded {len(whatsapp_chats)} WhatsApp chats")
+                    all_chats.extend(whatsapp_chats)
+            else:
+                print(f"⚠️ WhatsApp not ready: {status}")
+        except Exception as e:
+            print(f"WhatsApp chats error (skipping): {e}")
+        
+        # Сортируем по времени обновления (новые сверху)
+        all_chats.sort(key=lambda x: x.get('updated', 0), reverse=True)
+        
+        print(f"Total chats: {len(all_chats)}")
+        
+        return jsonify({
+            "chats": all_chats,
+            "current_user_id": current_user_id,
+            "sources": {
+                "avito": len([c for c in all_chats if c.get('source') == 'avito']),
+                "telegram": len([c for c in all_chats if c.get('source') == 'telegram']),
+                "whatsapp": len([c for c in all_chats if c.get('source') == 'whatsapp'])
+            }
+        })
     except Exception as e:
-        print(f"Telegram chats error (skipping): {e}")
-    
-    # === WHATSAPP ЧАТЫ ===
-    try:
-        # Сначала проверяем статус
-        status = whatsapp_client.get_whatsapp_status()
-        if status.get('ready'):
-            whatsapp_chats = whatsapp_client.get_whatsapp_chats(limit=30)
-            if whatsapp_chats:
-                print(f"Loaded {len(whatsapp_chats)} WhatsApp chats")
-                all_chats.extend(whatsapp_chats)
-        else:
-            print(f"⚠️ WhatsApp not ready: {status}")
-    except Exception as e:
-        print(f"WhatsApp chats error (skipping): {e}")
-    
-    # Сортируем по времени обновления (новые сверху)
-    all_chats.sort(key=lambda x: x.get('updated', 0), reverse=True)
-    
-    print(f"Total chats: {len(all_chats)}")
-    
-    return jsonify({
-        "chats": all_chats,
-        "current_user_id": current_user_id,
-        "sources": {
-            "avito": len([c for c in all_chats if c.get('source') == 'avito']),
-            "telegram": len([c for c in all_chats if c.get('source') == 'telegram']),
-            "whatsapp": len([c for c in all_chats if c.get('source') == 'whatsapp'])
-        }
-    })
+        import traceback
+        print(f"Error in get_chats: {e}\n{traceback.format_exc()}")
+        return jsonify({
+            "error": str(e),
+            "chats": [],
+            "current_user_id": None,
+            "sources": {"avito": 0, "telegram": 0, "whatsapp": 0}
+        }), 500
 
 
 @app.route('/api/messages', methods=['GET'])
@@ -1039,11 +1063,20 @@ def create_yclients_booking():
             try:
                 # Пытаемся распарсить как JSON
                 if isinstance(e.error_full, str):
-                    error_response["details"] = json.loads(e.error_full)
+                    try:
+                        error_response["details"] = json.loads(e.error_full)
+                    except json.JSONDecodeError:
+                        error_response["details"] = {"raw": e.error_full}
                 else:
                     error_response["details"] = e.error_full
-            except:
-                error_response["details"] = {"raw": str(e.error_full)}
+            except Exception as parse_err:
+                error_response["details"] = {"raw": str(e.error_full), "parse_error": str(parse_err)}
+        
+        # Также добавляем response.text если доступен
+        if hasattr(e, 'response') and e.response and hasattr(e.response, 'text'):
+            if 'details' not in error_response or not isinstance(error_response['details'], dict):
+                error_response["details"] = {}
+            error_response["details"]["response_text"] = e.response.text[:2000]  # Первые 2000 символов
         
         # Для 422 ошибок добавляем подсказку
         if status_code == 422:

@@ -6,24 +6,28 @@ echo "===================================="
 echo ""
 
 # Переходим в директорию проекта
-cd /Users/ilaeliseenko/Desktop/avito-messenger
+cd /Users/ilaeliseenko/avito-messenger
+
+# Используем токен из переменной окружения или вставляем здесь
+# Токен должен быть установлен в переменной окружения GITHUB_TOKEN
+# export GITHUB_TOKEN="ваш_токен_здесь"
+if [ -z "$GITHUB_TOKEN" ]; then
+    echo "❌ Ошибка: GITHUB_TOKEN не установлен!"
+    echo "Установите токен: export GITHUB_TOKEN=\"ваш_токен\""
+    exit 1
+fi
 
 # Добавляем все файлы
 git add .
 
-# Коммит
-git commit -m "Update to Client Credentials Flow with correct file structure"
+# Коммит (можно передать сообщение как аргумент)
+COMMIT_MSG="${1:-Auto commit $(date +'%Y-%m-%d %H:%M:%S')}"
+git commit -m "$COMMIT_MSG"
 
-# Push (потребуется токен)
+# Push с использованием токена
 echo ""
-echo "Сейчас потребуется ваш GitHub Personal Access Token"
-echo "Если у вас его нет, создайте здесь:"
-echo "https://github.com/settings/tokens/new"
-echo ""
-echo "Отметьте 'repo' и скопируйте токен"
-echo ""
-
-git push origin main
+echo "📤 Отправка изменений в GitHub..."
+git push https://${GITHUB_TOKEN}@github.com/tamgdemaslo/avito-messenger.git main
 
 echo ""
 echo "✅ Загрузка завершена!"

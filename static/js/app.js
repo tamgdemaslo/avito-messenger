@@ -268,10 +268,22 @@ async function loadChats(silent = false) {
     }
 }
 
-// Запрашиваем разрешение на уведомления
-if ('Notification' in window && Notification.permission === 'default') {
-    Notification.requestPermission();
+// Запрашиваем разрешение на уведомления только при первом взаимодействии пользователя
+// Не запрашиваем автоматически, чтобы избежать ошибки "Notification prompting can only be done from a user gesture"
+let notificationPermissionRequested = false;
+
+function requestNotificationPermission() {
+    if ('Notification' in window && Notification.permission === 'default' && !notificationPermissionRequested) {
+        Notification.requestPermission().then(permission => {
+            console.log('Notification permission:', permission);
+        });
+        notificationPermissionRequested = true;
+    }
 }
+
+// Запрашиваем разрешение при первом клике пользователя
+document.addEventListener('click', requestNotificationPermission, { once: true });
+document.addEventListener('touchstart', requestNotificationPermission, { once: true });
 
 // Ленивая загрузка аватарок Telegram (по одной в фоне)
 let avatarLoadQueue = [];
@@ -1485,6 +1497,17 @@ async function confirmYClientsBooking() {
             
             // Логируем полный ответ для отладки
             console.error('📋 Full booking error response:', data);
+            console.error('📋 Error details:', JSON.stringify(data.details, null, 2));
+            console.error('📋 Error status code:', data.status_code);
+            
+            // Логируем что именно было отправлено
+            const requestData = {
+                phone: phone,
+                fullname: fullname,
+                appointments: appointments,
+                comment: comment
+            };
+            console.error('📤 What was sent:', JSON.stringify(requestData, null, 2));
             
             // Если есть детали ошибки, добавляем их к сообщению
             if (data.details) {
@@ -1530,8 +1553,13 @@ async function confirmYClientsBooking() {
                     
                     // Если ничего не нашли, показываем весь объект
                     if (detailsParts.length === 0) {
-                        detailsParts.push(JSON.stringify(data.details, null, 2));
+                        // Показываем весь объект детально
+                        const fullDetails = JSON.stringify(data.details, null, 2);
+                        detailsParts.push(`Полный ответ:\n${fullDetails}`);
                     }
+                    
+                    // Всегда добавляем полный объект details для отладки
+                    console.log('📋 Full details object:', data.details);
                 } else {
                     // Если details - не объект, просто добавляем как строку
                     detailsParts.push(String(data.details));
