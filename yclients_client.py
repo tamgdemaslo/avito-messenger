@@ -290,7 +290,6 @@ def create_booking(phone, fullname, appointments, email="", comment=None, compan
         normalized_appointments.append(normalized_apt)
     
     payload = {
-        "id": int(cid),  # YClients API требует id в payload
         "phone": phone,
         "fullname": fullname,
         "email": email or f"{phone.replace('+', '').replace(' ', '')}@temp.mail",
