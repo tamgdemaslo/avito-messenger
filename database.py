@@ -58,6 +58,45 @@ def init_database():
             CREATE INDEX IF NOT EXISTS idx_source_id 
             ON customers(source, source_id)
         ''')
+        
+        # Таблица для шаблонов сообщений
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS message_templates (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                type TEXT NOT NULL,
+                text TEXT NOT NULL,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Таблица для отложенных задач отправки сообщений
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS scheduled_messages (
+                id SERIAL PRIMARY KEY,
+                phone TEXT NOT NULL,
+                fullname TEXT,
+                template_type TEXT NOT NULL,
+                message_text TEXT NOT NULL,
+                chat_id TEXT,
+                source TEXT,
+                send_at TIMESTAMP NOT NULL,
+                sent BOOLEAN DEFAULT FALSE,
+                sent_at TIMESTAMP,
+                error TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_scheduled_messages_send_at 
+            ON scheduled_messages(send_at) WHERE sent = FALSE
+        ''')
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_scheduled_messages_phone 
+            ON scheduled_messages(phone)
+        ''')
     else:
         # SQLite синтаксис
         cursor.execute('''
@@ -77,6 +116,45 @@ def init_database():
         cursor.execute('''
             CREATE INDEX IF NOT EXISTS idx_source_id 
             ON customers(source, source_id)
+        ''')
+        
+        # Таблица для шаблонов сообщений
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS message_templates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                type TEXT NOT NULL,
+                text TEXT NOT NULL,
+                is_active INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Таблица для отложенных задач отправки сообщений
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS scheduled_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                phone TEXT NOT NULL,
+                fullname TEXT,
+                template_type TEXT NOT NULL,
+                message_text TEXT NOT NULL,
+                chat_id TEXT,
+                source TEXT,
+                send_at TIMESTAMP NOT NULL,
+                sent INTEGER DEFAULT 0,
+                sent_at TIMESTAMP,
+                error TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_scheduled_messages_send_at 
+            ON scheduled_messages(send_at) WHERE sent = 0
+        ''')
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_scheduled_messages_phone 
+            ON scheduled_messages(phone)
         ''')
     
     conn.commit()
@@ -215,6 +293,213 @@ def get_all_customers(limit=100):
     conn.close()
     
     return [dict(row) for row in rows]
+
+
+# ==================== Функции для работы с шаблонами сообщений ====================
+
+def get_all_templates():
+    """Получить все шаблоны сообщений"""
+    conn = get_connection()
+    
+    if USE_POSTGRES:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute('SELECT * FROM message_templates ORDER BY created_at DESC')
+    else:
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM message_templates ORDER BY created_at DESC')
+    
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def get_template(template_id):
+    """Получить шаблон по ID"""
+    conn = get_connection()
+    
+    if USE_POSTGRES:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute('SELECT * FROM message_templates WHERE id = %s', (template_id,))
+    else:
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM message_templates WHERE id = ?', (template_id,))
+    
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def get_template_by_type(template_type):
+    """Получить активный шаблон по типу"""
+    conn = get_connection()
+    
+    if USE_POSTGRES:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute('''
+            SELECT * FROM message_templates 
+            WHERE type = %s AND is_active = TRUE 
+            ORDER BY created_at DESC 
+            LIMIT 1
+        ''', (template_type,))
+    else:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT * FROM message_templates 
+            WHERE type = ? AND is_active = 1 
+            ORDER BY created_at DESC 
+            LIMIT 1
+        ''', (template_type,))
+    
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def create_template(name, template_type, text, is_active=True):
+    """Создать новый шаблон"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    if USE_POSTGRES:
+        cursor.execute('''
+            INSERT INTO message_templates (name, type, text, is_active)
+            VALUES (%s, %s, %s, %s)
+            RETURNING id
+        ''', (name, template_type, text, is_active))
+        template_id = cursor.fetchone()[0]
+    else:
+        cursor.execute('''
+            INSERT INTO message_templates (name, type, text, is_active)
+            VALUES (?, ?, ?, ?)
+        ''', (name, template_type, text, 1 if is_active else 0))
+        template_id = cursor.lastrowid
+    
+    conn.commit()
+    conn.close()
+    return get_template(template_id)
+
+
+def update_template(template_id, name=None, template_type=None, text=None, is_active=None):
+    """Обновить шаблон"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    update_fields = []
+    params = []
+    
+    if name is not None:
+        update_fields.append('name = %s' if USE_POSTGRES else 'name = ?')
+        params.append(name)
+    if template_type is not None:
+        update_fields.append('type = %s' if USE_POSTGRES else 'type = ?')
+        params.append(template_type)
+    if text is not None:
+        update_fields.append('text = %s' if USE_POSTGRES else 'text = ?')
+        params.append(text)
+    if is_active is not None:
+        update_fields.append('is_active = %s' if USE_POSTGRES else 'is_active = ?')
+        params.append(1 if is_active else 0 if not USE_POSTGRES else is_active)
+    
+    update_fields.append('updated_at = %s' if USE_POSTGRES else 'updated_at = ?')
+    params.append(datetime.now())
+    params.append(template_id)
+    
+    placeholder = '%s' if USE_POSTGRES else '?'
+    cursor.execute(f'''
+        UPDATE message_templates 
+        SET {', '.join(update_fields)}
+        WHERE id = {placeholder}
+    ''', params)
+    
+    conn.commit()
+    conn.close()
+    return get_template(template_id)
+
+
+def delete_template(template_id):
+    """Удалить шаблон"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    if USE_POSTGRES:
+        cursor.execute('DELETE FROM message_templates WHERE id = %s', (template_id,))
+    else:
+        cursor.execute('DELETE FROM message_templates WHERE id = ?', (template_id,))
+    
+    conn.commit()
+    conn.close()
+
+
+# ==================== Функции для работы с отложенными задачами ====================
+
+def create_scheduled_message(phone, fullname, template_type, message_text, send_at, chat_id=None, source=None):
+    """Создать отложенную задачу отправки сообщения"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    if USE_POSTGRES:
+        cursor.execute('''
+            INSERT INTO scheduled_messages (phone, fullname, template_type, message_text, send_at, chat_id, source)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
+        ''', (phone, fullname, template_type, message_text, send_at, chat_id, source))
+        task_id = cursor.fetchone()[0]
+    else:
+        cursor.execute('''
+            INSERT INTO scheduled_messages (phone, fullname, template_type, message_text, send_at, chat_id, source)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (phone, fullname, template_type, message_text, send_at, chat_id, source))
+        task_id = cursor.lastrowid
+    
+    conn.commit()
+    conn.close()
+    return task_id
+
+
+def get_pending_scheduled_messages():
+    """Получить все неотправленные отложенные задачи, время отправки которых наступило"""
+    conn = get_connection()
+    
+    if USE_POSTGRES:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute('''
+            SELECT * FROM scheduled_messages 
+            WHERE sent = FALSE AND send_at <= CURRENT_TIMESTAMP
+            ORDER BY send_at ASC
+        ''')
+    else:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT * FROM scheduled_messages 
+            WHERE sent = 0 AND send_at <= datetime('now')
+            ORDER BY send_at ASC
+        ''')
+    
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def mark_scheduled_message_sent(task_id, error=None):
+    """Пометить отложенную задачу как отправленную"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    if USE_POSTGRES:
+        cursor.execute('''
+            UPDATE scheduled_messages 
+            SET sent = TRUE, sent_at = CURRENT_TIMESTAMP, error = %s
+            WHERE id = %s
+        ''', (error, task_id))
+    else:
+        cursor.execute('''
+            UPDATE scheduled_messages 
+            SET sent = 1, sent_at = datetime('now'), error = ?
+            WHERE id = ?
+        ''', (error, task_id))
+    
+    conn.commit()
+    conn.close()
 
 
 # Инициализируем БД при импорте модуля

@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Шаблоны сообщений - Avito Messenger</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=8">
+    <style>
+        .templates-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+        
+        .templates-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        .templates-header h1 {
+            margin: 0;
+            font-size: 28px;
+            color: #212529;
+        }
+        
+        .btn-primary {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+        
+        .templates-list {
+            display: grid;
+            gap: 24px;
+        }
+        
+        .template-card {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .template-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        
+        .template-card-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #212529;
+            margin: 0;
+        }
+        
+        .template-type-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-left: 12px;
+        }
+        
+        .badge-booking {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .badge-review {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .template-card-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 13px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .btn-edit {
+            background: #f8f9fa;
+            color: #495057;
+        }
+        
+        .btn-edit:hover {
+            background: #e9ecef;
+        }
+        
+        .btn-delete {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-delete:hover {
+            background: #c82333;
+        }
+        
+        .template-card-body {
+            margin-bottom: 16px;
+        }
+        
+        .template-text {
+            background: #f8f9fa;
+            padding: 16px;
+            border-radius: 6px;
+            white-space: pre-wrap;
+            color: #495057;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+        
+        .template-variables {
+            font-size: 12px;
+            color: #6c757d;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        
+        .template-variables strong {
+            color: #495057;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 8px;
+            padding: 32px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            margin-bottom: 24px;
+        }
+        
+        .modal-header h2 {
+            margin: 0;
+            font-size: 24px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #212529;
+        }
+        
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        
+        .form-group textarea {
+            min-height: 150px;
+            resize: vertical;
+        }
+        
+        .form-group select {
+            cursor: pointer;
+        }
+        
+        .form-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 24px;
+        }
+        
+        .btn-cancel {
+            background: #f8f9fa;
+            color: #495057;
+            border: 1px solid #dee2e6;
+        }
+        
+        .btn-cancel:hover {
+            background: #e9ecef;
+        }
+        
+        .back-link {
+            display: inline-block;
+            margin-bottom: 16px;
+            color: #007bff;
+            text-decoration: none;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 64px 24px;
+            color: #6c757d;
+        }
+        
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+        
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .toggle-slider {
+            background-color: #28a745;
+        }
+        
+        input:checked + .toggle-slider:before {
+            transform: translateX(20px);
+        }
+    </style>
+</head>
+<body>
+    <div class="templates-container">
+        <a href="/messages" class="back-link">← Назад к сообщениям</a>
+        
+        <div class="templates-header">
+            <h1>📝 Шаблоны сообщений</h1>
+            <button class="btn-primary" onclick="openCreateModal()">+ Создать шаблон</button>
+        </div>
+        
+        <div id="templatesList" class="templates-list">
+            <div class="loading">Загрузка шаблонов...</div>
+        </div>
+    </div>
+    
+    <!-- Modal для создания/редактирования -->
+    <div id="templateModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Создать шаблон</h2>
+            </div>
+            <form id="templateForm">
+                <input type="hidden" id="templateId" name="id">
+                
+                <div class="form-group">
+                    <label for="templateName">Название шаблона *</label>
+                    <input type="text" id="templateName" name="name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="templateType">Тип шаблона *</label>
+                    <select id="templateType" name="type" required>
+                        <option value="booking_confirmation">Уведомление о записи</option>
+                        <option value="review_request">Просьба оставить отзыв</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="templateText">Текст шаблона *</label>
+                    <textarea id="templateText" name="text" required></textarea>
+                    <small style="color: #6c757d; margin-top: 4px; display: block;">
+                        Доступные переменные: {fullname}, {phone}, {datetime}, {service_name}, {staff_name}, {comment}
+                    </small>
+                </div>
+                
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 12px; cursor: pointer;">
+                        <span>Активен</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="templateIsActive" name="is_active" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </label>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-sm btn-cancel" onclick="closeModal()">Отмена</button>
+                    <button type="submit" class="btn-sm btn-primary">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+        let templates = [];
+        let editingId = null;
+        
+        // Загрузить шаблоны
+        async function loadTemplates() {
+            try {
+                const response = await fetch('/api/templates');
+                const data = await response.json();
+                if (data.success) {
+                    templates = data.templates;
+                    renderTemplates();
+                } else {
+                    console.error('Ошибка загрузки шаблонов:', data.error);
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки шаблонов:', error);
+            }
+        }
+        
+        // Отобразить шаблоны
+        function renderTemplates() {
+            const container = document.getElementById('templatesList');
+            
+            if (templates.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                            <polyline points="10 9 9 9 8 9"></polyline>
+                        </svg>
+                        <p>Шаблоны не найдены. Создайте первый шаблон.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = templates.map(template => {
+                const typeLabels = {
+                    'booking_confirmation': { label: 'Уведомление о записи', class: 'badge-booking' },
+                    'review_request': { label: 'Просьба оставить отзыв', class: 'badge-review' }
+                };
+                const typeInfo = typeLabels[template.type] || { label: template.type, class: '' };
+                
+                return `
+                    <div class="template-card">
+                        <div class="template-card-header">
+                            <div>
+                                <h3 class="template-card-title">
+                                    ${template.name}
+                                    <span class="template-type-badge ${typeInfo.class}">${typeInfo.label}</span>
+                                </h3>
+                            </div>
+                            <div class="template-card-actions">
+                                <button class="btn-sm btn-edit" onclick="editTemplate(${template.id})">Редактировать</button>
+                                <button class="btn-sm btn-delete" onclick="deleteTemplate(${template.id})">Удалить</button>
+                            </div>
+                        </div>
+                        <div class="template-card-body">
+                            <div class="template-text">${escapeHtml(template.text)}</div>
+                            <div class="template-variables">
+                                <strong>Активен:</strong> ${template.is_active ? 'Да' : 'Нет'}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // Открыть модальное окно создания
+        function openCreateModal() {
+            editingId = null;
+            document.getElementById('modalTitle').textContent = 'Создать шаблон';
+            document.getElementById('templateForm').reset();
+            document.getElementById('templateId').value = '';
+            document.getElementById('templateIsActive').checked = true;
+            document.getElementById('templateModal').classList.add('active');
+        }
+        
+        // Редактировать шаблон
+        function editTemplate(id) {
+            const template = templates.find(t => t.id === id);
+            if (!template) return;
+            
+            editingId = id;
+            document.getElementById('modalTitle').textContent = 'Редактировать шаблон';
+            document.getElementById('templateId').value = template.id;
+            document.getElementById('templateName').value = template.name;
+            document.getElementById('templateType').value = template.type;
+            document.getElementById('templateText').value = template.text;
+            document.getElementById('templateIsActive').checked = template.is_active;
+            document.getElementById('templateModal').classList.add('active');
+        }
+        
+        // Закрыть модальное окно
+        function closeModal() {
+            document.getElementById('templateModal').classList.remove('active');
+        }
+        
+        // Сохранить шаблон
+        document.getElementById('templateForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = {
+                name: document.getElementById('templateName').value,
+                type: document.getElementById('templateType').value,
+                text: document.getElementById('templateText').value,
+                is_active: document.getElementById('templateIsActive').checked
+            };
+            
+            try {
+                let response;
+                if (editingId) {
+                    response = await fetch(`/api/templates/${editingId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(formData)
+                    });
+                } else {
+                    response = await fetch('/api/templates', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(formData)
+                    });
+                }
+                
+                const data = await response.json();
+                if (data.success) {
+                    closeModal();
+                    loadTemplates();
+                } else {
+                    alert('Ошибка сохранения: ' + (data.error || 'Неизвестная ошибка'));
+                }
+            } catch (error) {
+                console.error('Ошибка сохранения шаблона:', error);
+                alert('Ошибка сохранения шаблона');
+            }
+        });
+        
+        // Удалить шаблон
+        async function deleteTemplate(id) {
+            if (!confirm('Вы уверены, что хотите удалить этот шаблон?')) return;
+            
+            try {
+                const response = await fetch(`/api/templates/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    loadTemplates();
+                } else {
+                    alert('Ошибка удаления: ' + (data.error || 'Неизвестная ошибка'));
+                }
+            } catch (error) {
+                console.error('Ошибка удаления шаблона:', error);
+                alert('Ошибка удаления шаблона');
+            }
+        }
+        
+        // Экранирование HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Закрыть модальное окно по клику вне его
+        document.getElementById('templateModal').addEventListener('click', (e) => {
+            if (e.target.id === 'templateModal') {
+                closeModal();
+            }
+        });
+        
+        // Загрузить шаблоны при загрузке страницы
+        loadTemplates();
+    </script>
+</body>
+</html>

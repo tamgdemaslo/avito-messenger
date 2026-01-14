@@ -15,6 +15,7 @@ import telegram_client
 import whatsapp_client
 import database
 import yclients_client
+import notifications
 
 # Получаем абсолютный путь к директории проекта
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -156,6 +157,9 @@ def get_profile():
 @app.route('/api/chats', methods=['GET', 'OPTIONS'])
 def get_chats():
     """Получить объединенный список чатов из Avito и Telegram"""
+    # Проверяем отложенные задачи при запросе чатов
+    check_scheduled_messages()
+    
     try:
         all_chats = []
         current_user_id = None
@@ -1001,6 +1005,66 @@ def create_yclients_booking():
             comment=comment
         )
         
+        # После успешного создания записи отправляем уведомления
+        try:
+            # Получаем информацию о первой записи для формирования переменных
+            first_appointment = appointments[0] if appointments else {}
+            service_id = first_appointment.get('services', [first_appointment.get('service_id')])[0] if first_appointment.get('services') else first_appointment.get('service_id')
+            staff_id = first_appointment.get('staff_id')
+            datetime_str = first_appointment.get('datetime', '')
+            
+            # Получаем имена услуг и мастеров (если возможно)
+            service_name = None
+            staff_name = None
+            try:
+                services = yclients_client.get_services()
+                if services and isinstance(services, list):
+                    service = next((s for s in services if s.get('id') == service_id), None)
+                    if service:
+                        service_name = service.get('title') or service.get('name')
+                
+                staff_list = yclients_client.get_staff(service_ids=[service_id] if service_id else None)
+                if staff_list and isinstance(staff_list, list):
+                    staff = next((s for s in staff_list if s.get('id') == staff_id), None)
+                    if staff:
+                        staff_name = staff.get('name')
+            except Exception as e:
+                print(f"⚠️ Ошибка получения имен услуг/мастеров: {e}")
+            
+            # Формируем переменные для шаблонов
+            template_variables = {
+                'fullname': fullname,
+                'phone': phone,
+                'datetime': datetime_str,
+                'service_name': service_name or f'Услуга #{service_id}' if service_id else 'Услуга',
+                'staff_name': staff_name or f'Мастер #{staff_id}' if staff_id else 'Мастер',
+                'comment': comment or ''
+            }
+            
+            # Отправляем уведомление о записи
+            success, message = notifications.send_notification(
+                phone=phone,
+                fullname=fullname,
+                template_type='booking_confirmation',
+                variables=template_variables
+            )
+            if success:
+                print(f"✅ Уведомление о записи отправлено: {message}")
+            else:
+                print(f"⚠️ Не удалось отправить уведомление о записи: {message}")
+            
+            # Планируем отправку отзыва через 2 часа
+            if datetime_str:
+                notifications.schedule_review_request(
+                    phone=phone,
+                    fullname=fullname,
+                    booking_datetime=datetime_str,
+                    variables=template_variables
+                )
+        except Exception as e:
+            # Ошибки уведомлений не должны влиять на успех создания записи
+            print(f"⚠️ Ошибка отправки уведомлений: {e}")
+        
         return jsonify({"success": True, "data": result})
     except requests.exceptions.HTTPError as e:
         error_msg = str(e)
@@ -1105,6 +1169,122 @@ def create_yclients_booking():
             "type": type(e).__name__,
             "traceback": error_trace if app.debug else None
         }), 500
+
+
+# === API для работы с шаблонами сообщений ===
+
+@app.route('/api/templates', methods=['GET'])
+def get_templates():
+    """Получить все шаблоны сообщений"""
+    try:
+        templates = database.get_all_templates()
+        return jsonify({"success": True, "templates": templates})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/templates/<int:template_id>', methods=['GET'])
+def get_template(template_id):
+    """Получить шаблон по ID"""
+    try:
+        template = database.get_template(template_id)
+        if template:
+            return jsonify({"success": True, "template": template})
+        else:
+            return jsonify({"error": "Template not found"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/templates', methods=['POST'])
+def create_template():
+    """Создать новый шаблон"""
+    try:
+        data = request.json
+        name = data.get('name')
+        template_type = data.get('type')
+        text = data.get('text')
+        is_active = data.get('is_active', True)
+        
+        if not name or not template_type or not text:
+            return jsonify({"error": "name, type and text are required"}), 400
+        
+        template = database.create_template(name, template_type, text, is_active)
+        return jsonify({"success": True, "template": template})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/templates/<int:template_id>', methods=['PUT'])
+def update_template(template_id):
+    """Обновить шаблон"""
+    try:
+        data = request.json
+        name = data.get('name')
+        template_type = data.get('type')
+        text = data.get('text')
+        is_active = data.get('is_active')
+        
+        template = database.update_template(
+            template_id,
+            name=name,
+            template_type=template_type,
+            text=text,
+            is_active=is_active
+        )
+        
+        if template:
+            return jsonify({"success": True, "template": template})
+        else:
+            return jsonify({"error": "Template not found"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/templates/<int:template_id>', methods=['DELETE'])
+def delete_template(template_id):
+    """Удалить шаблон"""
+    try:
+        database.delete_template(template_id)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/templates')
+def templates_page():
+    """Страница управления шаблонами"""
+    return render_template('templates.html')
+
+
+@app.route('/api/scheduled-messages/process', methods=['POST'])
+def process_scheduled_messages_endpoint():
+    """Обработать отложенные задачи отправки сообщений"""
+    try:
+        notifications.process_scheduled_messages()
+        return jsonify({"success": True, "message": "Обработка завершена"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# Обрабатываем отложенные задачи при каждом запросе к API (но не слишком часто)
+_last_scheduled_check = None
+
+def check_scheduled_messages():
+    """Проверить и обработать отложенные задачи (не чаще раза в минуту)"""
+    global _last_scheduled_check
+    now = datetime.now()
+    
+    # Проверяем не чаще раза в минуту
+    if _last_scheduled_check and (now - _last_scheduled_check).total_seconds() < 60:
+        return
+    
+    _last_scheduled_check = now
+    
+    try:
+        notifications.process_scheduled_messages()
+    except Exception as e:
+        print(f"⚠️ Ошибка обработки отложенных задач: {e}")
 
 
 if __name__ == '__main__':
