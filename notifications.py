@@ -219,7 +219,20 @@ def process_scheduled_messages():
 
 
 def check_new_yclients_records():
-    """Проверить новые записи в YClients и отправить уведомления"""
+    """
+    Проверить новые записи в YClients и отправить уведомления
+    
+    ВАЖНО: Получение записей через API требует User Token (OAuth),
+    а не Partner Token. Partner Token работает только для создания записей.
+    
+    Пока что эта функция отключена, так как для получения записей нужен OAuth.
+    Уведомления будут отправляться только для записей, созданных через наш API.
+    """
+    # Отключаем автоматическую проверку, так как нужен User Token
+    # Для получения записей из YClients нужен OAuth токен пользователя
+    return
+    
+    # Код ниже не выполнится, но оставлен для будущей реализации с OAuth
     try:
         import yclients_client
         from datetime import datetime, timedelta
