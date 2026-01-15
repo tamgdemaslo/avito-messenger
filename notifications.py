@@ -216,3 +216,123 @@ def process_scheduled_messages():
                 )
     except Exception as e:
         print(f"❌ Ошибка обработки отложенных задач: {e}")
+
+
+def check_new_yclients_records():
+    """Проверить новые записи в YClients и отправить уведомления"""
+    try:
+        import yclients_client
+        from datetime import datetime, timedelta
+        
+        if not yclients_client.is_yclients_configured():
+            return
+        
+        # Получаем записи за последние 24 часа
+        date_from = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+        date_to = datetime.now().strftime('%Y-%m-%d')
+        
+        records = yclients_client.get_records(date_from=date_from, date_to=date_to, limit=100)
+        
+        if not records or not isinstance(records, list):
+            return
+        
+        # Получаем имена услуг и мастеров для подстановки
+        services = {}
+        staff = {}
+        try:
+            services_list = yclients_client.get_services()
+            if services_list and isinstance(services_list, list):
+                services = {s.get('id'): s.get('title') or s.get('name') for s in services_list}
+        except:
+            pass
+        
+        for record in records:
+            try:
+                record_id = str(record.get('id') or record.get('record_id', ''))
+                if not record_id:
+                    continue
+                
+                # Проверяем, была ли запись уже обработана
+                if database.is_record_processed(record_id):
+                    continue
+                
+                # Извлекаем данные записи
+                phone = record.get('phone') or record.get('client', {}).get('phone')
+                fullname = record.get('fullname') or record.get('client', {}).get('name')
+                
+                if not phone:
+                    continue
+                
+                # Получаем информацию о записи
+                appointments = record.get('appointments', [])
+                if not appointments and record.get('services'):
+                    # Если appointments нет, но есть services, формируем appointments
+                    appointments = [{
+                        'services': record.get('services', []),
+                        'staff_id': record.get('staff_id'),
+                        'datetime': record.get('date') or record.get('datetime')
+                    }]
+                
+                if not appointments:
+                    continue
+                
+                first_appointment = appointments[0]
+                service_id = first_appointment.get('services', [first_appointment.get('service_id')])[0] if first_appointment.get('services') else first_appointment.get('service_id')
+                staff_id = first_appointment.get('staff_id')
+                datetime_str = first_appointment.get('datetime') or record.get('date')
+                
+                # Получаем имена
+                service_name = services.get(service_id) if service_id and service_id in services else None
+                if not service_name and service_id:
+                    try:
+                        staff_list = yclients_client.get_staff(service_ids=[service_id] if service_id else None)
+                        if staff_list and isinstance(staff_list, list):
+                            staff_member = next((s for s in staff_list if s.get('id') == staff_id), None)
+                            if staff_member:
+                                staff[staff_id] = staff_member.get('name')
+                    except:
+                        pass
+                
+                staff_name = staff.get(staff_id) if staff_id else None
+                
+                # Формируем переменные для шаблонов
+                template_variables = {
+                    'fullname': fullname or 'Клиент',
+                    'phone': phone,
+                    'datetime': datetime_str or '',
+                    'service_name': service_name or f'Услуга #{service_id}' if service_id else 'Услуга',
+                    'staff_name': staff_name or f'Мастер #{staff_id}' if staff_id else 'Мастер',
+                    'comment': record.get('comment') or ''
+                }
+                
+                # Отправляем уведомление о записи
+                success, message = send_notification(
+                    phone=phone,
+                    fullname=fullname or 'Клиент',
+                    template_type='booking_confirmation',
+                    variables=template_variables
+                )
+                
+                if success:
+                    print(f"✅ Уведомление о записи отправлено для {fullname} ({phone}): {message}")
+                else:
+                    print(f"⚠️ Не удалось отправить уведомление для {fullname} ({phone}): {message}")
+                
+                # Планируем отправку отзыва через 2 часа
+                if datetime_str:
+                    schedule_review_request(
+                        phone=phone,
+                        fullname=fullname or 'Клиент',
+                        booking_datetime=datetime_str,
+                        variables=template_variables
+                    )
+                
+                # Помечаем запись как обработанную
+                database.mark_record_processed(record_id, phone, fullname, datetime_str)
+                
+            except Exception as e:
+                print(f"⚠️ Ошибка обработки записи {record.get('id', 'unknown')}: {e}")
+                continue
+                
+    except Exception as e:
+        print(f"❌ Ошибка проверки новых записей YClients: {e}")

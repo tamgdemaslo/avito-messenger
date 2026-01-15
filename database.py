@@ -97,6 +97,22 @@ def init_database():
             CREATE INDEX IF NOT EXISTS idx_scheduled_messages_phone 
             ON scheduled_messages(phone)
         ''')
+        
+        # Таблица для отслеживания обработанных записей YClients
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS processed_yclients_records (
+                id SERIAL PRIMARY KEY,
+                yclients_record_id TEXT NOT NULL UNIQUE,
+                phone TEXT NOT NULL,
+                fullname TEXT,
+                datetime TIMESTAMP,
+                processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_processed_records_id 
+            ON processed_yclients_records(yclients_record_id)
+        ''')
     else:
         # SQLite синтаксис
         cursor.execute('''
@@ -155,6 +171,22 @@ def init_database():
         cursor.execute('''
             CREATE INDEX IF NOT EXISTS idx_scheduled_messages_phone 
             ON scheduled_messages(phone)
+        ''')
+        
+        # Таблица для отслеживания обработанных записей YClients
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS processed_yclients_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                yclients_record_id TEXT NOT NULL UNIQUE,
+                phone TEXT NOT NULL,
+                fullname TEXT,
+                datetime TIMESTAMP,
+                processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_processed_records_id 
+            ON processed_yclients_records(yclients_record_id)
         ''')
     
     conn.commit()

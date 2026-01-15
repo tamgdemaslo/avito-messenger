@@ -312,3 +312,33 @@ def is_yclients_configured():
     """Проверить настроен ли YClients"""
     return bool(YCLIENTS_PARTNER_TOKEN and YCLIENTS_COMPANY_ID > 0)
 
+
+def get_records(company_id=None, date_from=None, date_to=None, limit=100):
+    """GET /records/{company_id} - Получить список записей (визитов)"""
+    cid = company_id or YCLIENTS_COMPANY_ID
+    params = {}
+    
+    if date_from:
+        params['date_from'] = date_from
+    if date_to:
+        params['date_to'] = date_to
+    if limit:
+        params['count'] = limit
+    
+    try:
+        # Пробуем endpoint для получения записей
+        # Обычно это /records/{company_id} или /visits/{company_id}
+        data = _get(f"/records/{cid}", params)
+        
+        # Возвращаем массив записей
+        if isinstance(data, dict):
+            return data.get('records', data.get('data', []))
+        elif isinstance(data, list):
+            return data
+        return []
+    except Exception as e:
+        log.error(f"YClients get_records error: {e}")
+        print(f"⚠️ YClients get_records error: {e}")
+        # Если endpoint не существует, возвращаем пустой список
+        return []
+

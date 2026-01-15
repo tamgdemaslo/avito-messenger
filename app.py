@@ -157,8 +157,9 @@ def get_profile():
 @app.route('/api/chats', methods=['GET', 'OPTIONS'])
 def get_chats():
     """Получить объединенный список чатов из Avito и Telegram"""
-    # Проверяем отложенные задачи при запросе чатов
+    # Проверяем отложенные задачи и новые записи YClients при запросе чатов
     check_scheduled_messages()
+    check_new_yclients_records()
     
     try:
         all_chats = []
@@ -1270,6 +1271,8 @@ def process_scheduled_messages_endpoint():
 # Обрабатываем отложенные задачи при каждом запросе к API (но не слишком часто)
 _last_scheduled_check = None
 
+_last_yclients_check = None
+
 def check_scheduled_messages():
     """Проверить и обработать отложенные задачи (не чаще раза в минуту)"""
     global _last_scheduled_check
@@ -1285,6 +1288,23 @@ def check_scheduled_messages():
         notifications.process_scheduled_messages()
     except Exception as e:
         print(f"⚠️ Ошибка обработки отложенных задач: {e}")
+
+
+def check_new_yclients_records():
+    """Проверить новые записи в YClients (не чаще раза в 5 минут)"""
+    global _last_yclients_check
+    now = datetime.now()
+    
+    # Проверяем не чаще раза в 5 минут
+    if _last_yclients_check and (now - _last_yclients_check).total_seconds() < 300:
+        return
+    
+    _last_yclients_check = now
+    
+    try:
+        notifications.check_new_yclients_records()
+    except Exception as e:
+        print(f"⚠️ Ошибка проверки новых записей YClients: {e}")
 
 
 if __name__ == '__main__':
