@@ -224,8 +224,6 @@ def check_new_yclients_records():
     
     Использует User Token из OAuth интеграции для получения записей.
     """
-    
-    # Код ниже не выполнится, но оставлен для будущей реализации с OAuth
     try:
         import yclients_client
         from datetime import datetime, timedelta
