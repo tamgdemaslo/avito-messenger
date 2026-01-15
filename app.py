@@ -1274,12 +1274,12 @@ _last_scheduled_check = None
 _last_yclients_check = None
 
 def check_scheduled_messages():
-    """Проверить и обработать отложенные задачи (не чаще раза в минуту)"""
+    """Проверить и обработать отложенные задачи (не чаще раза в 10 секунд - для теста)"""
     global _last_scheduled_check
     now = datetime.now()
     
-    # Проверяем не чаще раза в минуту
-    if _last_scheduled_check and (now - _last_scheduled_check).total_seconds() < 60:
+    # Проверяем не чаще раза в 10 секунд (для теста)
+    if _last_scheduled_check and (now - _last_scheduled_check).total_seconds() < 10:
         return
     
     _last_scheduled_check = now
@@ -1291,12 +1291,12 @@ def check_scheduled_messages():
 
 
 def check_new_yclients_records():
-    """Проверить новые записи в YClients (не чаще раза в 5 минут)"""
+    """Проверить новые записи в YClients (не чаще раза в 10 секунд - для теста)"""
     global _last_yclients_check
     now = datetime.now()
     
-    # Проверяем не чаще раза в 5 минут
-    if _last_yclients_check and (now - _last_yclients_check).total_seconds() < 300:
+    # Проверяем не чаще раза в 10 секунд (для теста)
+    if _last_yclients_check and (now - _last_yclients_check).total_seconds() < 10:
         return
     
     _last_yclients_check = now
