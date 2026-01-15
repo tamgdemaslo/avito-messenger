@@ -317,14 +317,69 @@ def get_records(company_id=None, date_from=None, date_to=None, limit=100):
     """
     GET /records/{company_id} - Получить список записей (визитов)
     
-    ВАЖНО: Этот endpoint требует User Token, а не Partner Token.
-    Partner Token работает только для booking endpoints (создание записей).
-    
-    Для получения записей нужен User Token, который получается через OAuth.
-    Пока что возвращаем пустой список, чтобы не было ошибок 401.
+    Требует User Token (OAuth интеграция), а не Partner Token.
     """
-    # Partner Token не поддерживает получение записей
-    # Для этого нужен User Token (OAuth)
-    print("⚠️ get_records: Partner Token не поддерживает получение записей. Нужен User Token (OAuth).")
-    return []
+    cid = company_id or YCLIENTS_COMPANY_ID
+    
+    # Получаем User Token из БД
+    try:
+        import database
+        user_token = database.get_yclients_user_token(cid)
+        
+        if not user_token:
+            print(f"⚠️ User Token не найден для компании {cid}. Интеграция не подключена.")
+            return []
+        
+        # Используем User Token вместо Partner Token
+        headers = {
+            "Authorization": f"Bearer {user_token}",
+            "Accept": "application/vnd.yclients.v2+json",
+            "Content-Type": "application/json"
+        }
+        
+        params = {}
+        if date_from:
+            params['date_from'] = date_from
+        if date_to:
+            params['date_to'] = date_to
+        if limit:
+            params['count'] = limit
+        
+        url = API + f"/records/{cid}"
+        
+        try:
+            response = requests.get(url, headers=headers, params=params, timeout=10)
+            response.raise_for_status()
+            result = response.json()
+            
+            # Возвращаем массив записей
+            if isinstance(result, dict):
+                data = result.get('data', result)
+                if isinstance(data, dict):
+                    return data.get('records', data.get('data', []))
+                elif isinstance(data, list):
+                    return data
+            elif isinstance(result, list):
+                return result
+            
+            return []
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 401:
+                print(f"⚠️ User Token недействителен для компании {cid}. Возможно, интеграция отключена.")
+                # Деактивируем интеграцию
+                database.deactivate_yclients_integration(cid)
+            log.error(f"YClients get_records error ({url}): {e}")
+            print(f"⚠️ YClients get_records error: {e}")
+            return []
+        except Exception as e:
+            log.error(f"YClients get_records error ({url}): {e}")
+            print(f"⚠️ YClients get_records error: {e}")
+            return []
+    
+    except ImportError:
+        print("⚠️ Модуль database не найден")
+        return []
+    except Exception as e:
+        print(f"⚠️ Ошибка получения User Token: {e}")
+        return []
 

@@ -113,6 +113,23 @@ def init_database():
             CREATE INDEX IF NOT EXISTS idx_processed_records_id 
             ON processed_yclients_records(yclients_record_id)
         ''')
+        
+        # Таблица для OAuth интеграций YClients
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS yclients_integrations (
+                id SERIAL PRIMARY KEY,
+                company_id INTEGER NOT NULL UNIQUE,
+                user_token TEXT NOT NULL,
+                user_id INTEGER,
+                company_name TEXT,
+                connected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                is_active BOOLEAN DEFAULT TRUE
+            )
+        ''')
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_yclients_integrations_company_id 
+            ON yclients_integrations(company_id)
+        ''')
     else:
         # SQLite синтаксис
         cursor.execute('''
@@ -187,6 +204,23 @@ def init_database():
         cursor.execute('''
             CREATE INDEX IF NOT EXISTS idx_processed_records_id 
             ON processed_yclients_records(yclients_record_id)
+        ''')
+        
+        # Таблица для OAuth интеграций YClients
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS yclients_integrations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_id INTEGER NOT NULL UNIQUE,
+                user_token TEXT NOT NULL,
+                user_id INTEGER,
+                company_name TEXT,
+                connected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                is_active INTEGER DEFAULT 1
+            )
+        ''')
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_yclients_integrations_company_id 
+            ON yclients_integrations(company_id)
         ''')
     
     conn.commit()

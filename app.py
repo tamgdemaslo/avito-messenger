@@ -1307,6 +1307,132 @@ def check_new_yclients_records():
         print(f"⚠️ Ошибка проверки новых записей YClients: {e}")
 
 
+# ==================== YClients OAuth Integration ====================
+
+@app.route('/yclients/connect', methods=['GET', 'POST'])
+def yclients_connect():
+    """
+    Endpoint для подключения YClients интеграции через OAuth
+    
+    YClients отправляет сюда данные при подключении интеграции:
+    - company_id: ID компании
+    - user_token: User Token для API запросов
+    - user_id: ID пользователя
+    - company_name: Название компании (опционально)
+    """
+    try:
+        if request.method == 'GET':
+            # GET запрос - показываем страницу подключения
+            company_id = request.args.get('company_id')
+            user_token = request.args.get('user_token')
+            user_id = request.args.get('user_id')
+            company_name = request.args.get('company_name', '')
+            
+            if not company_id or not user_token:
+                return render_template('yclients_connect.html', 
+                                      error="Отсутствуют обязательные параметры (company_id, user_token)")
+            
+            # Сохраняем интеграцию
+            success = database.save_yclients_integration(
+                company_id=company_id,
+                user_token=user_token,
+                user_id=user_id,
+                company_name=company_name
+            )
+            
+            if success:
+                return render_template('yclients_connect.html', 
+                                    success=True,
+                                    company_id=company_id,
+                                    company_name=company_name)
+            else:
+                return render_template('yclients_connect.html', 
+                                    error="Ошибка сохранения интеграции")
+        
+        elif request.method == 'POST':
+            # POST запрос - обработка данных от YClients
+            data = request.json or request.form.to_dict()
+            
+            company_id = data.get('company_id')
+            user_token = data.get('user_token')
+            user_id = data.get('user_id')
+            company_name = data.get('company_name', '')
+            
+            if not company_id or not user_token:
+                return jsonify({
+                    "success": False,
+                    "error": "Отсутствуют обязательные параметры (company_id, user_token)"
+                }), 400
+            
+            # Сохраняем интеграцию
+            success = database.save_yclients_integration(
+                company_id=company_id,
+                user_token=user_token,
+                user_id=user_id,
+                company_name=company_name
+            )
+            
+            if success:
+                return jsonify({
+                    "success": True,
+                    "message": f"Интеграция успешно подключена для компании {company_id}"
+                })
+            else:
+                return jsonify({
+                    "success": False,
+                    "error": "Ошибка сохранения интеграции"
+                }), 500
+    
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"❌ Ошибка подключения YClients интеграции: {e}\n{error_trace}")
+        
+        if request.method == 'GET':
+            return render_template('yclients_connect.html', 
+                                error=f"Ошибка: {str(e)}")
+        else:
+            return jsonify({
+                "success": False,
+                "error": str(e)
+            }), 500
+
+
+@app.route('/api/yclients/webhook', methods=['POST'])
+def yclients_webhook():
+    """
+    Webhook endpoint для получения событий от YClients
+    
+    Обрабатывает события:
+    - Отключение интеграции
+    - Изменение прав доступа
+    """
+    try:
+        data = request.json or {}
+        event_type = data.get('event_type') or data.get('type')
+        company_id = data.get('company_id')
+        
+        print(f"📥 YClients webhook: {event_type} для компании {company_id}")
+        
+        if event_type == 'integration_disconnected' or event_type == 'disconnect':
+            # Интеграция отключена
+            if company_id:
+                database.deactivate_yclients_integration(company_id)
+                print(f"✅ Интеграция деактивирована для компании {company_id}")
+                return jsonify({"success": True, "message": "Интеграция деактивирована"})
+        
+        return jsonify({"success": True, "message": "Webhook обработан"})
+    
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"❌ Ошибка обработки YClients webhook: {e}\n{error_trace}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
 if __name__ == '__main__':
     print("=" * 50)
     print("Avito Messenger (Client Credentials) запускается...")
