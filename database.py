@@ -568,6 +568,55 @@ def mark_scheduled_message_sent(task_id, error=None):
     conn.close()
 
 
+# ==================== Функции для отслеживания обработанных записей YClients ====================
+
+def mark_record_processed(yclients_record_id, phone, fullname=None, datetime_value=None):
+    """Пометить запись YClients как обработанную"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    try:
+        if USE_POSTGRES:
+            cursor.execute('''
+                INSERT INTO processed_yclients_records (yclients_record_id, phone, fullname, datetime)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (yclients_record_id) DO NOTHING
+            ''', (str(yclients_record_id), phone, fullname, datetime_value))
+        else:
+            cursor.execute('''
+                INSERT OR IGNORE INTO processed_yclients_records (yclients_record_id, phone, fullname, datetime)
+                VALUES (?, ?, ?, ?)
+            ''', (str(yclients_record_id), phone, fullname, datetime_value))
+        
+        conn.commit()
+    except Exception as e:
+        print(f"⚠️ Ошибка сохранения обработанной записи: {e}")
+    finally:
+        conn.close()
+
+
+def is_record_processed(yclients_record_id):
+    """Проверить, была ли запись уже обработана"""
+    conn = get_connection()
+    
+    if USE_POSTGRES:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute('''
+            SELECT * FROM processed_yclients_records 
+            WHERE yclients_record_id = %s
+        ''', (str(yclients_record_id),))
+    else:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT * FROM processed_yclients_records 
+            WHERE yclients_record_id = ?
+        ''', (str(yclients_record_id),))
+    
+    row = cursor.fetchone()
+    conn.close()
+    return row is not None
+
+
 # Инициализируем БД при импорте модуля
 try:
     init_database()
